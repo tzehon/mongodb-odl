@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Set
 from bson import ObjectId
 from bson.decimal128 import Decimal128
+from bson.timestamp import Timestamp
 from motor.motor_asyncio import AsyncIOMotorCollection
 
 from config import settings
@@ -22,6 +23,8 @@ def serialize_value(value: Any) -> Any:
         return value.isoformat()
     elif isinstance(value, Decimal128):
         return float(value.to_decimal())
+    elif isinstance(value, Timestamp):
+        return {"t": value.time, "i": value.inc}
     elif isinstance(value, dict):
         return {k: serialize_value(v) for k, v in value.items()}
     elif isinstance(value, list):

@@ -20,9 +20,9 @@ export function SyncMonitor() {
   }, [syncStatus?.documentCount]);
 
   const syncLag = syncStatus?.syncLagSeconds;
-  // If sync lag > 60s, streaming is likely idle (not actively sending data)
-  const isStreamingIdle = syncLag > 60;
-  const syncStatus_color = !syncLag ? 'gray' : syncLag < 30 ? 'green' : syncLag < 60 ? 'yellow' : 'gray';
+  // Thresholds: < 60s = OK, 60-120s = Slow, > 120s = Idle
+  const isStreamingIdle = syncLag > 120;
+  const syncStatus_color = !syncLag ? 'gray' : syncLag < 60 ? 'green' : syncLag < 120 ? 'yellow' : 'gray';
 
   return (
     <Card title="Real-time Sync Monitor" subtitle="Data pipeline status">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Database, ArrowRight, Cloud, Server, Activity } from 'lucide-react';
+import { Database, ArrowRight, Cloud, Server, Activity, Info } from 'lucide-react';
 import { Card } from './common/Card';
 import { Badge } from './common/Badge';
 import { useMetrics } from '../hooks/useMetrics';
@@ -19,12 +19,15 @@ export function SyncMonitor() {
     }
   }, [syncStatus?.documentCount]);
 
-  const syncLag = syncStatus?.syncLagSeconds;
-  // SLA Target: < 10 seconds sync latency
-  // When streaming is active, lag should be < 10s
-  // When idle (> 30s), show as "Idle" not "Delayed"
-  const isStreamingIdle = syncLag > 30;
-  const syncStatus_color = !syncLag ? 'gray' : syncLag < 10 ? 'green' : syncLag < 30 ? 'yellow' : 'gray';
+  // pipelineLatencySeconds = true pipeline latency (Spark batch processing to detection)
+  // timeSinceLastSync = time since last document (for idle detection)
+  const pipelineLatency = syncStatus?.pipelineLatencySeconds;
+  const timeSinceLastSync = syncStatus?.timeSinceLastSync;
+
+  // SLA Target: < 10 seconds pipeline latency
+  // If no new data in 30s, show as Idle
+  const isStreamingIdle = timeSinceLastSync > 30;
+  const latencyStatus = pipelineLatency == null ? 'gray' : pipelineLatency < 10 ? 'green' : pipelineLatency < 30 ? 'yellow' : 'gray';
 
   return (
     <Card title="Real-time Sync Monitor" subtitle="Data pipeline status">
@@ -99,21 +102,31 @@ export function SyncMonitor() {
             </div>
           </div>
 
-          {/* Sync Lag */}
+          {/* Pipeline Latency */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
             <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 mb-1">
               <ArrowRight className="w-4 h-4" />
-              <span className="text-xs font-medium">Sync Lag</span>
+              <span className="text-xs font-medium">Pipeline Latency</span>
+              <div className="group relative">
+                <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all w-64 z-10">
+                  <div className="font-medium mb-1">How is this measured?</div>
+                  <div className="text-gray-300">
+                    T2 - T1: Actual Spark batch processing + MongoDB write time. Excludes trigger interval wait time.
+                  </div>
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                {isStreamingIdle ? 'Idle' : syncLag != null ? `${syncLag.toFixed(0)}s` : 'N/A'}
+                {isStreamingIdle ? 'Idle' : pipelineLatency != null ? `${pipelineLatency.toFixed(0)}s` : 'N/A'}
               </span>
               <Badge
-                variant={syncStatus_color === 'green' ? 'success' : syncStatus_color === 'yellow' ? 'warning' : 'default'}
+                variant={latencyStatus === 'green' ? 'success' : latencyStatus === 'yellow' ? 'warning' : 'default'}
                 size="sm"
               >
-                {isStreamingIdle ? 'No active stream' : syncStatus_color === 'green' ? 'OK' : syncStatus_color === 'yellow' ? 'Slow' : 'Unknown'}
+                {isStreamingIdle ? 'No active stream' : latencyStatus === 'green' ? 'OK' : latencyStatus === 'yellow' ? 'Slow' : 'Unknown'}
               </Badge>
             </div>
           </div>

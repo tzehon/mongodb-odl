@@ -4,12 +4,29 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Set
+from bson import ObjectId
+from bson.decimal128 import Decimal128
 from motor.motor_asyncio import AsyncIOMotorCollection
 
 from config import settings
 from .mongodb import MongoDBService
 
 logger = logging.getLogger(__name__)
+
+
+def serialize_value(value: Any) -> Any:
+    """Serialize BSON types to JSON-compatible values."""
+    if isinstance(value, ObjectId):
+        return str(value)
+    elif isinstance(value, datetime):
+        return value.isoformat()
+    elif isinstance(value, Decimal128):
+        return float(value.to_decimal())
+    elif isinstance(value, dict):
+        return {k: serialize_value(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [serialize_value(item) for item in value]
+    return value
 
 
 class ChangeStreamService:
@@ -112,9 +129,9 @@ class ChangeStreamService:
 
         event = {
             "operationType": operation_type,
-            "documentKey": change.get("documentKey", {}),
-            "timestamp": datetime.utcnow(),
-            "clusterTime": change.get("clusterTime"),
+            "documentKey": serialize_value(change.get("documentKey", {})),
+            "timestamp": datetime.utcnow().isoformat(),
+            "clusterTime": serialize_value(change.get("clusterTime")),
         }
 
         # Include full document for insert/update/replace
@@ -123,7 +140,7 @@ class ChangeStreamService:
             if full_doc:
                 # Remove MongoDB internal fields
                 full_doc.pop("_id", None)
-                event["fullDocument"] = self._summarize_document(full_doc)
+                event["fullDocument"] = serialize_value(self._summarize_document(full_doc))
 
         # Include update description for updates
         if operation_type == "update":

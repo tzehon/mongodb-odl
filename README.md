@@ -91,6 +91,41 @@ Follow these steps in order:
 Delta Lake ──CDF──▶ Spark ──Connector──▶ MongoDB ──Change Streams──▶ FastAPI ──WebSocket──▶ Browser
 ```
 
+### Pipeline Latency Measurement
+
+The dashboard shows **Pipeline Latency** - the actual time Spark takes to process a batch and write to MongoDB.
+
+```
+                    TIMELINE
+    ────────────────────────────────────────────────────────────────▶ time
+
+    T0              T1                      T2
+    │               │                       │
+    ▼               ▼                       ▼
+┌───────┐     ┌───────────┐          ┌───────────┐     ┌──────────────┐
+│ Data  │     │  Spark    │          │  MongoDB  │     │   Dashboard  │
+│Created│     │  Batch    │          │  Write    │────▶│ (via Change  │
+│       │     │ Starts    │          │ Complete  │     │   Streams)   │
+└───────┘     └───────────┘          └───────────┘     └──────────────┘
+    │               │                       │                  │
+    │◄─────────────►│◄─────────────────────►│                  │
+    │ Trigger Wait  │     Pipeline          │    Real-time     │
+    │ (excluded)    │     Latency           │    (no polling)  │
+    │               │     (measured)        │                  │
+```
+
+**How it works:**
+1. **T0**: Data created in Delta Lake (has `generatedAt` timestamp)
+2. **T1**: Spark batch starts processing (captured as `_batchStartTime`)
+3. **T2**: Spark writes to MongoDB (captured as `_processedAt`)
+4. **Dashboard**: Receives update via Change Streams (real-time, no polling)
+
+**Pipeline Latency = T2 - T1** (actual Spark processing + MongoDB write time)
+
+This measures exactly how long Spark takes to process and write data:
+- Excludes trigger interval wait time (T0 → T1)
+- Change Streams push updates to dashboard in real-time (no polling delay)
+
 ---
 
 ## Step 1: MongoDB Atlas Setup

@@ -215,9 +215,14 @@ from pyspark.sql.functions import expr, transform, struct, col
 
 def write_to_mongodb(batch_df, batch_id):
     """Write a micro-batch to MongoDB with upsert logic."""
+    from datetime import datetime, timezone
+
     if batch_df.isEmpty():
         print(f"Batch {batch_id}: Empty batch, skipping")
         return
+
+    # Capture batch start time (T1) - when Spark starts processing this batch
+    batch_start_time = datetime.now(timezone.utc)
 
     record_count = batch_df.count()
     print(f"Batch {batch_id}: Processing {record_count} records...")
@@ -257,6 +262,13 @@ def write_to_mongodb(batch_df, batch_id):
                     ) as metadata
                 ))
             """)
+        ).withColumn(
+            # T1: When Spark batch started processing
+            "_batchStartTime", lit(batch_start_time.isoformat())
+        ).withColumn(
+            # T2: When data is about to be written to MongoDB
+            # Pipeline Latency = _processedAt - _batchStartTime
+            "_processedAt", lit(datetime.now(timezone.utc).isoformat())
         )
 
         # Write to MongoDB using the Spark Connector
@@ -360,8 +372,13 @@ for q in spark.streams.active:
 # Dead Letter Queue implementation (for production use)
 def write_to_mongodb_with_dlq(batch_df, batch_id):
     """Write to MongoDB with dead letter queue for failed records."""
+    from datetime import datetime, timezone
+
     if batch_df.isEmpty():
         return
+
+    # Capture batch start time (T1)
+    batch_start_time = datetime.now(timezone.utc)
 
     # Filter actionable changes
     actionable_df = batch_df.filter(
@@ -394,6 +411,12 @@ def write_to_mongodb_with_dlq(batch_df, batch_id):
                     ) as metadata
                 ))
             """)
+        ).withColumn(
+            # T1: When Spark batch started processing
+            "_batchStartTime", lit(batch_start_time.isoformat())
+        ).withColumn(
+            # T2: When data is about to be written to MongoDB
+            "_processedAt", lit(datetime.now(timezone.utc).isoformat())
         )
 
         final_df.write \

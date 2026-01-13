@@ -11,19 +11,23 @@ export function AccountLookup({ onAccountSelect }) {
   const [accountData, setAccountData] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [error, setError] = useState(null);
 
   // Load account list on mount
   useEffect(() => {
     async function loadAccounts() {
+      setLoadingAccounts(true);
       try {
         const accountList = await accountsApi.list(100);
         setAccounts(accountList);
-        if (accountList.length > 0 && !selectedAccount) {
+        if (accountList.length > 0) {
           setSelectedAccount(accountList[0]);
         }
       } catch (e) {
         console.error('Failed to load accounts:', e);
+      } finally {
+        setLoadingAccounts(false);
       }
     }
     loadAccounts();
@@ -70,14 +74,21 @@ export function AccountLookup({ onAccountSelect }) {
           <select
             value={selectedAccount}
             onChange={(e) => setSelectedAccount(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-mongodb-green focus:border-transparent"
+            disabled={loadingAccounts}
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-mongodb-green focus:border-transparent disabled:opacity-50"
           >
-            <option value="">Select an account...</option>
-            {accounts.map((acc) => (
-              <option key={acc} value={acc}>
-                {acc}
-              </option>
-            ))}
+            {loadingAccounts ? (
+              <option value="">Loading accounts...</option>
+            ) : (
+              <>
+                <option value="">Select an account...</option>
+                {accounts.map((acc) => (
+                  <option key={acc} value={acc}>
+                    {acc}
+                  </option>
+                ))}
+              </>
+            )}
           </select>
         </div>
 

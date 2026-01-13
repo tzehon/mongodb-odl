@@ -14,24 +14,33 @@ export function AccountLookup({ onAccountSelect }) {
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load account list on mount
+  // Load account list on mount and refresh periodically
   useEffect(() => {
     async function loadAccounts() {
-      setLoadingAccounts(true);
       try {
         const accountList = await accountsApi.list(100);
-        setAccounts(accountList);
-        if (accountList.length > 0) {
-          setSelectedAccount(accountList[0]);
-        }
+        setAccounts((prev) => {
+          // Only update if the list changed
+          if (JSON.stringify(prev) !== JSON.stringify(accountList)) {
+            // Auto-select first account if none selected and list has items
+            if (!selectedAccount && accountList.length > 0) {
+              setSelectedAccount(accountList[0]);
+            }
+            return accountList;
+          }
+          return prev;
+        });
       } catch (e) {
         console.error('Failed to load accounts:', e);
       } finally {
         setLoadingAccounts(false);
       }
     }
+
     loadAccounts();
-  }, []);
+    const interval = setInterval(loadAccounts, 5000); // Refresh every 5 seconds
+    return () => clearInterval(interval);
+  }, [selectedAccount]);
 
   // Load account details when selection changes
   useEffect(() => {

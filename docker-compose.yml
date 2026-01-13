@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: odl-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-banking_odl}
+      - MONGODB_MIN_POOL_SIZE=10
+      - MONGODB_MAX_POOL_SIZE=100
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_DEBUG=${API_DEBUG:-false}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CORS_ORIGINS=*
+      - ENABLE_METRICS=true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - odl-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: odl-frontend
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - odl-network
+
+  # Locust Load Testing
+  locust:
+    build:
+      context: ./load-testing
+      dockerfile: Dockerfile
+    container_name: odl-locust
+    ports:
+      - "8089:8089"
+    environment:
+      - LOCUST_HOST=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    command: locust -f locustfile.py --host=http://api:8000 --web-host=0.0.0.0
+    networks:
+      - odl-network
+
+networks:
+  odl-network:
+    driver: bridge
+
+volumes:
+  api-logs:

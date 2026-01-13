@@ -13,6 +13,7 @@ function App() {
   const [apiHealthy, setApiHealthy] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [darkMode, setDarkMode] = useState(true); // Dark mode by default
+  const [loadTestStarted, setLoadTestStarted] = useState(false);
 
   // Apply dark mode class to html element
   useEffect(() => {
@@ -153,9 +154,9 @@ function App() {
             </div>
 
             {/* Performance and Load Test */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <PerformanceDashboard />
-              <LoadTestPanel />
+            <div className={`grid grid-cols-1 ${loadTestStarted ? 'lg:grid-cols-2' : ''} gap-6`}>
+              {loadTestStarted && <PerformanceDashboard />}
+              <LoadTestPanel onTestStart={() => setLoadTestStarted(true)} />
             </div>
           </div>
         )}
@@ -178,9 +179,9 @@ function App() {
 
         {activeTab === 'performance' && (
           <div className="space-y-6">
-            <PerformanceDashboard />
+            {loadTestStarted && <PerformanceDashboard />}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <LoadTestPanel />
+              <LoadTestPanel onTestStart={() => setLoadTestStarted(true)} />
               <ChangeStreamFeed accountNumber={selectedAccount} />
             </div>
           </div>

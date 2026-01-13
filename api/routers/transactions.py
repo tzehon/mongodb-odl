@@ -2,9 +2,17 @@
 
 from datetime import datetime
 from typing import Optional
+from bson.decimal128 import Decimal128
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from services import MongoDBService, get_mongodb_service
+
+
+def to_float(value) -> float:
+    """Convert Decimal128 or other numeric types to float."""
+    if isinstance(value, Decimal128):
+        return float(value.to_decimal())
+    return float(value) if value is not None else 0.0
 
 router = APIRouter(prefix="/api/v1/accounts", tags=["transactions"])
 
@@ -222,10 +230,10 @@ async def get_transaction_stats(
     stats = results[0]
     stats.pop("_id", None)
 
-    # Round numeric values
+    # Convert Decimal128 values to float and round
     for key in ["totalCredits", "totalDebits", "avgAmount", "maxAmount", "minAmount"]:
         if stats.get(key) is not None:
-            stats[key] = round(stats[key], 2)
+            stats[key] = round(to_float(stats[key]), 2)
 
     return stats
 

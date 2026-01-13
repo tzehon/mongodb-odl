@@ -39,12 +39,10 @@ export function SyncMonitor() {
           </div>
 
           {/* Arrow with animation */}
-          <div className="flex-1 mx-4 relative">
-            <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+          <div className="flex-1 mx-4 flex flex-col items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400">Spark Streaming</span>
+            <div className="w-full h-1 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
               <div className="h-full w-1/3 bg-mongodb-green data-flow" />
-            </div>
-            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-              <span className="text-xs text-gray-500 dark:text-gray-400">Spark Streaming</span>
             </div>
           </div>
 
@@ -58,12 +56,10 @@ export function SyncMonitor() {
           </div>
 
           {/* Arrow */}
-          <div className="flex-1 mx-4 relative">
-            <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+          <div className="flex-1 mx-4 flex flex-col items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400">API</span>
+            <div className="w-full h-1 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
               <div className="h-full w-full bg-mongodb-green opacity-50" />
-            </div>
-            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-              <span className="text-xs text-gray-500 dark:text-gray-400">API</span>
             </div>
           </div>
 

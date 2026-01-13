@@ -2,10 +2,18 @@
 
 from datetime import datetime
 from typing import List, Optional
+from bson.decimal128 import Decimal128
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from models import AccountStatement, AccountStatementSummary, BalanceResponse
 from services import MongoDBService, get_mongodb_service
+
+
+def to_float(value) -> float:
+    """Convert Decimal128 or other numeric types to float."""
+    if isinstance(value, Decimal128):
+        return float(value.to_decimal())
+    return float(value) if value is not None else 0.0
 
 router = APIRouter(prefix="/api/v1/accounts", tags=["accounts"])
 
@@ -122,12 +130,12 @@ async def get_account_summary(
 
     transactions = statement.get("transactions", [])
 
-    # Calculate totals
+    # Calculate totals (convert Decimal128 to float)
     total_credits = sum(
-        t.get("amount", 0) for t in transactions if t.get("type") == "credit"
+        to_float(t.get("amount", 0)) for t in transactions if t.get("type") == "credit"
     )
     total_debits = sum(
-        t.get("amount", 0) for t in transactions if t.get("type") == "debit"
+        to_float(t.get("amount", 0)) for t in transactions if t.get("type") == "debit"
     )
 
     summary = {
@@ -137,8 +145,8 @@ async def get_account_summary(
         "branch": statement.get("branch"),
         "currency": statement.get("currency"),
         "statementPeriod": statement.get("statementPeriod"),
-        "openingBalance": statement.get("openingBalance"),
-        "closingBalance": statement.get("closingBalance"),
+        "openingBalance": to_float(statement.get("openingBalance")),
+        "closingBalance": to_float(statement.get("closingBalance")),
         "transactionCount": len(transactions),
         "totalCredits": total_credits,
         "totalDebits": total_debits,

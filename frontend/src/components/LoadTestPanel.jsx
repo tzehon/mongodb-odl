@@ -5,7 +5,7 @@ import { Badge } from './common/Badge';
 import { LoadingSpinner } from './common/LoadingSpinner';
 import { accountsApi, transactionsApi, searchApi } from '../services/api';
 
-export function LoadTestPanel() {
+export function LoadTestPanel({ onTestStart }) {
   const [config, setConfig] = useState({
     concurrentUsers: 10,
     durationSeconds: 30,
@@ -26,17 +26,24 @@ export function LoadTestPanel() {
   const abortControllerRef = useRef(null);
   const statsRef = useRef(liveStats);
 
-  // Load accounts for testing
+  // Load accounts for testing (with periodic refresh)
   useEffect(() => {
     async function loadAccounts() {
       try {
         const accountList = await accountsApi.list(50);
-        setAccounts(accountList);
+        setAccounts((prev) => {
+          if (JSON.stringify(prev) !== JSON.stringify(accountList)) {
+            return accountList;
+          }
+          return prev;
+        });
       } catch (e) {
         console.error('Failed to load accounts:', e);
       }
     }
     loadAccounts();
+    const interval = setInterval(loadAccounts, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // Keep statsRef in sync
@@ -58,6 +65,7 @@ export function LoadTestPanel() {
     }
 
     setIsRunning(true);
+    onTestStart?.();
     setResults(null);
     setLiveStats({
       requests: 0,
@@ -365,32 +373,49 @@ export function LoadTestPanel() {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-4 text-sm border-t pt-3">
+            <div className="grid grid-cols-4 gap-4 text-sm border-t border-gray-200 dark:border-gray-600 pt-3">
               <div>
                 <span className="text-gray-500 dark:text-gray-400">Avg Latency:</span>{' '}
-                <span className="font-medium">{results.averageLatencyMs.toFixed(1)}ms</span>
+                <span className="font-medium text-gray-900 dark:text-white">{results.averageLatencyMs.toFixed(1)}ms</span>
               </div>
               <div>
                 <span className="text-gray-500 dark:text-gray-400">P50:</span>{' '}
-                <span className="font-medium">{results.p50LatencyMs.toFixed(1)}ms</span>
+                <span className="font-medium text-gray-900 dark:text-white">{results.p50LatencyMs.toFixed(1)}ms</span>
               </div>
               <div>
                 <span className="text-gray-500 dark:text-gray-400">P99:</span>{' '}
-                <span className="font-medium">{results.p99LatencyMs.toFixed(1)}ms</span>
+                <span className="font-medium text-gray-900 dark:text-white">{results.p99LatencyMs.toFixed(1)}ms</span>
               </div>
               <div>
                 <span className="text-gray-500 dark:text-gray-400">Duration:</span>{' '}
-                <span className="font-medium">{results.durationSeconds.toFixed(1)}s</span>
+                <span className="font-medium text-gray-900 dark:text-white">{results.durationSeconds.toFixed(1)}s</span>
               </div>
             </div>
           </div>
         )}
 
+        {/* Query Types Info */}
+        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-xs">
+          <div className="font-medium text-gray-700 dark:text-gray-200 mb-2">Query Mix:</div>
+          <div className="grid grid-cols-3 gap-2 text-gray-600 dark:text-gray-300">
+            <div>
+              <span className="font-medium">50%</span> Transactions
+              <div className="text-gray-400 dark:text-gray-500">Aggregation pipeline</div>
+            </div>
+            <div>
+              <span className="font-medium">33%</span> Balance
+              <div className="text-gray-400 dark:text-gray-500">findOne query</div>
+            </div>
+            <div>
+              <span className="font-medium">17%</span> Search
+              <div className="text-gray-400 dark:text-gray-500">Atlas Search</div>
+            </div>
+          </div>
+        </div>
+
         {/* Help text */}
         {!isRunning && !results && (
-          <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-            Configure test parameters and click "Start Test" to run a load test.
-            <br />
+          <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
             Target SLA: {config.targetQps} QPS, &lt;100ms p95 latency
           </div>
         )}

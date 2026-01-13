@@ -1,0 +1,48 @@
+{
+  "name": "transaction_autocomplete",
+  "definition": {
+    "mappings": {
+      "dynamic": false,
+      "fields": {
+        "accountNumber": {
+          "type": "string",
+          "analyzer": "lucene.keyword"
+        },
+        "transactions": {
+          "type": "document",
+          "fields": {
+            "description": {
+              "type": "autocomplete",
+              "analyzer": "lucene.standard",
+              "tokenization": "edgeGram",
+              "minGrams": 2,
+              "maxGrams": 15,
+              "foldDiacritics": true
+            },
+            "merchant": {
+              "type": "autocomplete",
+              "analyzer": "lucene.standard",
+              "tokenization": "edgeGram",
+              "minGrams": 2,
+              "maxGrams": 15,
+              "foldDiacritics": true
+            }
+          }
+        },
+        "accountHolder": {
+          "type": "document",
+          "fields": {
+            "name": {
+              "type": "autocomplete",
+              "analyzer": "lucene.standard",
+              "tokenization": "edgeGram",
+              "minGrams": 2,
+              "maxGrams": 20,
+              "foldDiacritics": true
+            }
+          }
+        }
+      }
+    }
+  }
+}

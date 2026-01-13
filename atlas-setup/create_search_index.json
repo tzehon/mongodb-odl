@@ -1,0 +1,120 @@
+{
+  "name": "transaction_search",
+  "definition": {
+    "analyzer": "lucene.standard",
+    "searchAnalyzer": "lucene.standard",
+    "mappings": {
+      "dynamic": false,
+      "fields": {
+        "accountNumber": {
+          "type": "string",
+          "analyzer": "lucene.keyword"
+        },
+        "accountHolder": {
+          "type": "document",
+          "fields": {
+            "name": {
+              "type": "string",
+              "analyzer": "lucene.standard",
+              "multi": {
+                "keywordAnalyzer": {
+                  "type": "string",
+                  "analyzer": "lucene.keyword"
+                }
+              }
+            },
+            "email": {
+              "type": "string",
+              "analyzer": "lucene.keyword"
+            }
+          }
+        },
+        "accountType": {
+          "type": "stringFacet"
+        },
+        "branch": {
+          "type": "document",
+          "fields": {
+            "name": {
+              "type": "string",
+              "analyzer": "lucene.standard"
+            },
+            "region": {
+              "type": "stringFacet"
+            }
+          }
+        },
+        "transactions": {
+          "type": "document",
+          "fields": {
+            "description": {
+              "type": "string",
+              "analyzer": "lucene.standard",
+              "searchAnalyzer": "lucene.standard"
+            },
+            "merchant": {
+              "type": "string",
+              "analyzer": "lucene.standard",
+              "multi": {
+                "keywordAnalyzer": {
+                  "type": "string",
+                  "analyzer": "lucene.keyword"
+                }
+              }
+            },
+            "category": {
+              "type": "stringFacet"
+            },
+            "type": {
+              "type": "stringFacet"
+            },
+            "amount": {
+              "type": "number"
+            },
+            "date": {
+              "type": "date"
+            },
+            "metadata": {
+              "type": "document",
+              "fields": {
+                "channel": {
+                  "type": "stringFacet"
+                },
+                "location": {
+                  "type": "string",
+                  "analyzer": "lucene.standard"
+                }
+              }
+            }
+          }
+        },
+        "statementPeriod": {
+          "type": "document",
+          "fields": {
+            "startDate": {
+              "type": "date"
+            },
+            "endDate": {
+              "type": "date"
+            }
+          }
+        },
+        "openingBalance": {
+          "type": "number"
+        },
+        "closingBalance": {
+          "type": "number"
+        }
+      }
+    },
+    "synonyms": [
+      {
+        "name": "merchant_synonyms",
+        "analyzer": "lucene.standard",
+        "source": {
+          "collection": "synonyms"
+        }
+      }
+    ]
+  }
+}

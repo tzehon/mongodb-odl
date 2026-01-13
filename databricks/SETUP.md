@@ -430,7 +430,7 @@ The streaming runs **continuously** using a micro-batch pattern:
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-1. **Every trigger interval** (default: 10 seconds), Spark checks Delta Lake for new changes
+1. **Every trigger interval** (default: 5 seconds), Spark checks Delta Lake for new changes
 2. **If changes exist**, it reads them, transforms them, and writes to MongoDB
 3. **If no changes**, it waits for the next interval
 4. **Checkpoint** tracks progress - if the notebook restarts, it resumes where it left off
@@ -438,7 +438,7 @@ The streaming runs **continuously** using a micro-batch pattern:
 
 | Setting | What It Controls |
 |---------|------------------|
-| `trigger_interval` | How often to check for changes (e.g., "10 seconds") |
+| `trigger_interval` | How often to check for changes (e.g., "5 seconds") |
 | `checkpoint_path` | Where to save progress (survives restarts) |
 | `start_fresh` | If true, ignores checkpoint and reprocesses all data |
 
@@ -476,7 +476,7 @@ query = delta_stream \
     .writeStream \
     .foreachBatch(write_to_mongodb) \      # Call our function for each batch
     .option("checkpointLocation", path) \  # Track progress
-    .trigger(processingTime="10 seconds") \# Check every 10 seconds
+    .trigger(processingTime="5 seconds") \# Check every 5 seconds
     .start()
 ```
 
@@ -484,7 +484,7 @@ query = delta_stream \
 1. **Read** changes from Delta Lake (not all data, just what changed)
 2. **Transform** each batch (rename columns to match MongoDB schema)
 3. **Write** to MongoDB Atlas using the Spark Connector
-4. **Repeat** every 10 seconds
+4. **Repeat** every 5 seconds
 
 #### What About MongoDB Change Streams?
 
@@ -549,7 +549,7 @@ query = delta_stream \
    - `mongodb_uri`: Paste your MongoDB Atlas connection string (see Section 5)
    - `mongodb_database`: `banking_odl`
    - `mongodb_collection`: `account_statements`
-   - `trigger_interval`: `10 seconds` (how often to check for new data)
+   - `trigger_interval`: `5 seconds` (how often to check for new data)
    - `checkpoint_path`: `/Workspace/Users/<your-email>/checkpoints/odl_streaming` (see note below)
    - `start_fresh`: `false` (set to `true` to reprocess all data)
 
@@ -570,14 +570,14 @@ query = delta_stream \
 | Notebook | Role | Runs... |
 |----------|------|---------|
 | **02_data_generator** | Creates new data in Delta Lake | Only when YOU run it |
-| **03_streaming_to_mongodb** | Moves data from Delta Lake → MongoDB | Continuously (every 10 sec) |
+| **03_streaming_to_mongodb** | Moves data from Delta Lake → MongoDB | Continuously (every 5 sec) |
 
-**The 10-second interval** is how often notebook 03 *checks* for new data - not how often data is created.
+**The 5-second interval** is how often notebook 03 *checks* for new data - not how often data is created.
 
 ```
 You run notebook 02          Notebook 03 (always running)
         │                              │
-        │ creates data                 │ checks every 10 seconds
+        │ creates data                 │ checks every 5 seconds
         ▼                              ▼
    Delta Lake ─────────────────▶ MongoDB Atlas
         │                              │
@@ -596,7 +596,7 @@ To demonstrate real-time data flow, run **both notebooks simultaneously**:
    - `generation_interval_seconds`: `5` (new data every 5 seconds)
    - `continuous_duration_minutes`: `5` (run for 5 minutes)
 4. Click **Run All** on notebook 02
-5. Watch new data appear in MongoDB within 10 seconds
+5. Watch new data appear in MongoDB within 5-10 seconds
 
 ---
 

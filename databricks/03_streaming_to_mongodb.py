@@ -23,7 +23,7 @@ dbutils.widgets.text("catalog", "main", "Catalog Name")
 dbutils.widgets.text("schema", "banking_odl", "Schema/Database Name")
 dbutils.widgets.text("mongodb_database", "banking_odl", "MongoDB Database")
 dbutils.widgets.text("mongodb_collection", "account_statements", "MongoDB Collection")
-dbutils.widgets.text("trigger_interval", "10 seconds", "Trigger Interval")
+dbutils.widgets.text("trigger_interval", "5 seconds", "Trigger Interval")
 # Note: Update this path with your username if DBFS is disabled
 # Use format: /Workspace/Users/<your-email>/checkpoints/odl_streaming
 dbutils.widgets.text("checkpoint_path", "/Workspace/checkpoints/odl_streaming/account_statements", "Checkpoint Path")

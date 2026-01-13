@@ -100,7 +100,7 @@ export function ChangeStreamFeed({ accountNumber }) {
             placeholder="Filter by account number..."
             value={filterAccount}
             onChange={(e) => setFilterAccount(e.target.value)}
-            className="flex-1 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-mongodb-green focus:border-transparent"
+            className="flex-1 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-mongodb-green focus:border-transparent"
           />
           <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
             <input
@@ -115,7 +115,7 @@ export function ChangeStreamFeed({ accountNumber }) {
 
         {/* Error display */}
         {error && (
-          <div className="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-sm">
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-3 py-2 rounded-lg text-sm">
             {error}
           </div>
         )}
@@ -139,7 +139,7 @@ export function ChangeStreamFeed({ accountNumber }) {
             displayEvents.map((event) => (
               <div
                 key={event.id}
-                className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border border-gray-100 animate-slide-in"
+                className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border border-gray-100 dark:border-gray-700 animate-slide-in"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">

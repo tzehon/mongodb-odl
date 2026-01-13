@@ -88,7 +88,7 @@ export function AccountLookup({ onAccountSelect }) {
         )}
 
         {error && (
-          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
             {error}
           </div>
         )}
@@ -128,28 +128,28 @@ export function AccountLookup({ onAccountSelect }) {
 
             {/* Quick stats */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-emerald-50 rounded-lg p-3">
-                <div className="flex items-center gap-2 text-emerald-700 mb-1">
+              <div className="bg-emerald-50 dark:bg-emerald-900/30 rounded-lg p-3">
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 mb-1">
                   <TrendingUp className="w-4 h-4" />
                   <span className="text-xs font-medium">Total Credits</span>
                 </div>
-                <div className="text-lg font-bold text-emerald-800">
+                <div className="text-lg font-bold text-emerald-800 dark:text-emerald-300">
                   {formatCurrency(stats?.totalCredits || accountData.totalCredits)}
                 </div>
-                <div className="text-xs text-emerald-600">
+                <div className="text-xs text-emerald-600 dark:text-emerald-400">
                   {stats?.creditCount || '-'} transactions
                 </div>
               </div>
 
-              <div className="bg-rose-50 rounded-lg p-3">
-                <div className="flex items-center gap-2 text-rose-700 mb-1">
+              <div className="bg-rose-50 dark:bg-rose-900/30 rounded-lg p-3">
+                <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 mb-1">
                   <TrendingDown className="w-4 h-4" />
                   <span className="text-xs font-medium">Total Debits</span>
                 </div>
-                <div className="text-lg font-bold text-rose-800">
+                <div className="text-lg font-bold text-rose-800 dark:text-rose-300">
                   {formatCurrency(stats?.totalDebits || accountData.totalDebits)}
                 </div>
-                <div className="text-xs text-rose-600">
+                <div className="text-xs text-rose-600 dark:text-rose-400">
                   {stats?.debitCount || '-'} transactions
                 </div>
               </div>

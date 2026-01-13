@@ -52,6 +52,7 @@ export function PerformanceDashboard() {
   const qpsMet = metrics?.sla?.qpsMet ?? false;
   const latencyMet = metrics?.sla?.latencyMet ?? false;
   const overallPassed = metrics?.sla?.overallPassed ?? false;
+  const isIdle = (metrics?.currentQps || 0) < 1; // No load test running
 
   return (
     <Card
@@ -60,7 +61,7 @@ export function PerformanceDashboard() {
       action={
         <button
           onClick={reset}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 dark:bg-gray-700/50"
         >
           <RefreshCw className="w-4 h-4" />
           Reset
@@ -71,14 +72,18 @@ export function PerformanceDashboard() {
         {/* SLA Status Banner */}
         <div
           className={`rounded-lg p-4 ${
-            overallPassed
+            isIdle
+              ? 'bg-gray-50 dark:bg-gray-700/50 border border-gray-200'
+              : overallPassed
               ? 'bg-green-50 border border-green-200'
               : 'bg-red-50 border border-red-200'
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {overallPassed ? (
+              {isIdle ? (
+                <Activity className="w-8 h-8 text-gray-400" />
+              ) : overallPassed ? (
                 <CheckCircle className="w-8 h-8 text-green-500" />
               ) : (
                 <XCircle className="w-8 h-8 text-red-500" />
@@ -86,26 +91,26 @@ export function PerformanceDashboard() {
               <div>
                 <div
                   className={`font-semibold ${
-                    overallPassed ? 'text-green-800' : 'text-red-800'
+                    isIdle ? 'text-gray-600 dark:text-gray-300' : overallPassed ? 'text-green-800' : 'text-red-800'
                   }`}
                 >
-                  SLA Status: {overallPassed ? 'PASSING' : 'NOT MET'}
+                  {isIdle ? 'Ready for Load Test' : overallPassed ? 'SLA Status: PASSING' : 'SLA Status: NOT MET'}
                 </div>
                 <div
                   className={`text-sm ${
-                    overallPassed ? 'text-green-600' : 'text-red-600'
+                    isIdle ? 'text-gray-500 dark:text-gray-400' : overallPassed ? 'text-green-600' : 'text-red-600'
                   }`}
                 >
-                  Target: {SLA_QPS} QPS, &lt;{SLA_LATENCY}ms p95 latency
+                  {isIdle ? 'Run a load test to measure performance against SLA targets' : `Target: ${SLA_QPS} QPS, <${SLA_LATENCY}ms p95 latency`}
                 </div>
               </div>
             </div>
             <div className="flex gap-4">
-              <Badge variant={qpsMet ? 'success' : 'error'} dot>
-                QPS {qpsMet ? 'OK' : 'Low'}
+              <Badge variant={isIdle ? 'default' : qpsMet ? 'success' : 'error'} dot>
+                QPS {isIdle ? 'Idle' : qpsMet ? 'OK' : 'Low'}
               </Badge>
-              <Badge variant={latencyMet ? 'success' : 'error'} dot>
-                Latency {latencyMet ? 'OK' : 'High'}
+              <Badge variant={isIdle ? 'default' : latencyMet ? 'success' : 'error'} dot>
+                Latency {isIdle ? 'Idle' : latencyMet ? 'OK' : 'High'}
               </Badge>
             </div>
           </div>
@@ -114,15 +119,15 @@ export function PerformanceDashboard() {
         {/* Metrics Grid */}
         <div className="grid grid-cols-4 gap-4">
           {/* Current QPS */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center gap-2 text-gray-600 mb-1">
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 mb-1">
               <Activity className="w-4 h-4" />
               <span className="text-xs font-medium">Current QPS</span>
             </div>
-            <div className="text-3xl font-bold text-gray-900">
+            <div className="text-3xl font-bold text-gray-900 dark:text-white">
               {metrics?.currentQps?.toFixed(1) || '0'}
             </div>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Target: {SLA_QPS}
             </div>
             <div className="mt-2 h-1 bg-gray-200 rounded-full overflow-hidden">
@@ -138,21 +143,21 @@ export function PerformanceDashboard() {
           </div>
 
           {/* P50 Latency */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center gap-2 text-gray-600 mb-1">
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 mb-1">
               <Clock className="w-4 h-4" />
               <span className="text-xs font-medium">P50 Latency</span>
             </div>
-            <div className="text-3xl font-bold text-gray-900">
+            <div className="text-3xl font-bold text-gray-900 dark:text-white">
               {metrics?.p50LatencyMs?.toFixed(0) || '0'}
-              <span className="text-lg font-normal text-gray-500">ms</span>
+              <span className="text-lg font-normal text-gray-500 dark:text-gray-400">ms</span>
             </div>
-            <div className="text-xs text-gray-500 mt-1">Median response time</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Median response time</div>
           </div>
 
           {/* P95 Latency */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center gap-2 text-gray-600 mb-1">
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 mb-1">
               <Clock className="w-4 h-4" />
               <span className="text-xs font-medium">P95 Latency</span>
             </div>
@@ -166,7 +171,7 @@ export function PerformanceDashboard() {
               {metrics?.p95LatencyMs?.toFixed(0) || '0'}
               <span className="text-lg font-normal">ms</span>
             </div>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Target: &lt;{SLA_LATENCY}ms
             </div>
             <div className="mt-2 h-1 bg-gray-200 rounded-full overflow-hidden">
@@ -182,16 +187,16 @@ export function PerformanceDashboard() {
           </div>
 
           {/* P99 Latency */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center gap-2 text-gray-600 mb-1">
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 mb-1">
               <Clock className="w-4 h-4" />
               <span className="text-xs font-medium">P99 Latency</span>
             </div>
-            <div className="text-3xl font-bold text-gray-900">
+            <div className="text-3xl font-bold text-gray-900 dark:text-white">
               {metrics?.p99LatencyMs?.toFixed(0) || '0'}
-              <span className="text-lg font-normal text-gray-500">ms</span>
+              <span className="text-lg font-normal text-gray-500 dark:text-gray-400">ms</span>
             </div>
-            <div className="text-xs text-gray-500 mt-1">99th percentile</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">99th percentile</div>
           </div>
         </div>
 
@@ -202,7 +207,7 @@ export function PerformanceDashboard() {
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               selectedMetric === 'qps'
                 ? 'border-mongodb-green text-mongodb-green'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
           >
             QPS
@@ -212,7 +217,7 @@ export function PerformanceDashboard() {
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               selectedMetric === 'latency'
                 ? 'border-mongodb-green text-mongodb-green'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
           >
             Latency
@@ -285,17 +290,17 @@ export function PerformanceDashboard() {
         {/* Additional stats */}
         <div className="grid grid-cols-3 gap-4 text-sm border-t pt-4">
           <div>
-            <span className="text-gray-500">Uptime:</span>{' '}
+            <span className="text-gray-500 dark:text-gray-400">Uptime:</span>{' '}
             <span className="font-medium">
               {Math.floor((metrics?.uptime || 0) / 60)}m {Math.floor((metrics?.uptime || 0) % 60)}s
             </span>
           </div>
           <div>
-            <span className="text-gray-500">Error Rate:</span>{' '}
+            <span className="text-gray-500 dark:text-gray-400">Error Rate:</span>{' '}
             <span className="font-medium">{metrics?.errorRate?.toFixed(2) || 0}%</span>
           </div>
           <div>
-            <span className="text-gray-500">Connections:</span>{' '}
+            <span className="text-gray-500 dark:text-gray-400">Connections:</span>{' '}
             <span className="font-medium">
               {metrics?.connectionPoolStats?.current || 0} active
             </span>

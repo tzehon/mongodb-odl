@@ -163,7 +163,7 @@ export function TransactionExplorer({ accountNumber }) {
   if (!accountNumber) {
     return (
       <Card title="Transaction Explorer" subtitle="Select an account to view transactions">
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           Please select an account from the Account Lookup panel
         </div>
       </Card>
@@ -183,20 +183,20 @@ export function TransactionExplorer({ accountNumber }) {
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
               showFilters || activeFiltersCount > 0
                 ? 'bg-mongodb-green text-white border-mongodb-green'
-                : 'border-gray-200 hover:bg-gray-50'
+                : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:bg-gray-700/50'
             }`}
           >
             <Filter className="w-4 h-4" />
             Filters
             {activeFiltersCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-xs bg-white/20 rounded">
+              <span className="ml-1 px-1.5 py-0.5 text-xs bg-white dark:bg-gray-800/20 rounded">
                 {activeFiltersCount}
               </span>
             )}
           </button>
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-700/50"
           >
             <Download className="w-4 h-4" />
             Export
@@ -213,12 +213,12 @@ export function TransactionExplorer({ accountNumber }) {
             placeholder="Search transactions (e.g., fairprice, grab, utilities)"
             value={filters.search}
             onChange={(e) => handleFilterChange('search', e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mongodb-green focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mongodb-green focus:border-transparent"
           />
           {filters.search && (
             <button
               onClick={() => handleFilterChange('search', '')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-300"
             >
               <X className="w-4 h-4" />
             </button>
@@ -227,9 +227,9 @@ export function TransactionExplorer({ accountNumber }) {
 
         {/* Filters panel */}
         {showFilters && (
-          <div className="bg-gray-50 rounded-lg p-4 space-y-3 animate-fade-in">
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 space-y-3 animate-fade-in">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Filters</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Filters</span>
               <button
                 onClick={clearFilters}
                 className="text-xs text-mongodb-leaf hover:underline"
@@ -240,11 +240,11 @@ export function TransactionExplorer({ accountNumber }) {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Category</label>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Category</label>
                 <select
                   value={filters.category}
                   onChange={(e) => handleFilterChange('category', e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg"
                 >
                   <option value="">All</option>
                   {categories.map((cat) => (
@@ -256,11 +256,11 @@ export function TransactionExplorer({ accountNumber }) {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Type</label>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Type</label>
                 <select
                   value={filters.type}
                   onChange={(e) => handleFilterChange('type', e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg"
                 >
                   <option value="">All</option>
                   <option value="credit">Credit</option>
@@ -269,44 +269,44 @@ export function TransactionExplorer({ accountNumber }) {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Min Amount</label>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Min Amount</label>
                 <input
                   type="number"
                   value={filters.minAmount}
                   onChange={(e) => handleFilterChange('minAmount', e.target.value)}
                   placeholder="0"
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Max Amount</label>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Max Amount</label>
                 <input
                   type="number"
                   value={filters.maxAmount}
                   onChange={(e) => handleFilterChange('maxAmount', e.target.value)}
                   placeholder="10000"
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Start Date</label>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
                 <input
                   type="date"
                   value={filters.startDate}
                   onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">End Date</label>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">End Date</label>
                 <input
                   type="date"
                   value={filters.endDate}
                   onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg"
                 />
               </div>
             </div>
@@ -320,13 +320,13 @@ export function TransactionExplorer({ accountNumber }) {
               <LoadingSpinner size="lg" />
             </div>
           ) : transactions.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
               No transactions found
             </div>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="text-left text-xs text-gray-500 border-b">
+                <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b">
                   <th className="pb-2 font-medium">Date</th>
                   <th className="pb-2 font-medium">Description</th>
                   <th className="pb-2 font-medium">Category</th>
@@ -336,18 +336,18 @@ export function TransactionExplorer({ accountNumber }) {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {transactions.map((tx, idx) => (
-                  <tr key={tx.transactionId || idx} className="hover:bg-gray-50">
-                    <td className="py-3 text-sm text-gray-600">
+                  <tr key={tx.transactionId || idx} className="hover:bg-gray-50 dark:bg-gray-700/50">
+                    <td className="py-3 text-sm text-gray-600 dark:text-gray-300">
                       {new Date(tx.date).toLocaleDateString('en-SG', {
                         day: '2-digit',
                         month: 'short',
                       })}
                     </td>
                     <td className="py-3">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
                         {tx.merchant}
                       </div>
-                      <div className="text-xs text-gray-500 truncate max-w-xs">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-xs">
                         {tx.description}
                       </div>
                     </td>
@@ -359,14 +359,14 @@ export function TransactionExplorer({ accountNumber }) {
                     <td className="py-3 text-right">
                       <span
                         className={`text-sm font-medium ${
-                          tx.type === 'credit' ? 'text-emerald-600' : 'text-gray-900'
+                          tx.type === 'credit' ? 'text-emerald-600' : 'text-gray-900 dark:text-white'
                         }`}
                       >
                         {tx.type === 'credit' ? '+' : '-'}
                         {formatCurrency(tx.amount)}
                       </span>
                     </td>
-                    <td className="py-3 text-right text-sm text-gray-600">
+                    <td className="py-3 text-right text-sm text-gray-600 dark:text-gray-300">
                       {tx.runningBalance !== undefined
                         ? formatCurrency(tx.runningBalance)
                         : '-'}
@@ -381,7 +381,7 @@ export function TransactionExplorer({ accountNumber }) {
         {/* Pagination */}
         {!searchResults && pagination.totalPages > 1 && (
           <div className="flex items-center justify-between border-t pt-4">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               Showing {(pagination.page - 1) * pagination.pageSize + 1} -{' '}
               {Math.min(pagination.page * pagination.pageSize, pagination.total)} of{' '}
               {pagination.total}
@@ -390,17 +390,17 @@ export function TransactionExplorer({ accountNumber }) {
               <button
                 onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
                 disabled={pagination.page === 1}
-                className="p-1.5 border border-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                className="p-1.5 border border-gray-200 dark:border-gray-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:bg-gray-700/50"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 dark:text-gray-300">
                 Page {pagination.page} of {pagination.totalPages}
               </span>
               <button
                 onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
                 disabled={!pagination.hasNext}
-                className="p-1.5 border border-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                className="p-1.5 border border-gray-200 dark:border-gray-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:bg-gray-700/50"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

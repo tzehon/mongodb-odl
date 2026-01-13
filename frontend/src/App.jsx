@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database, Activity, AlertCircle } from 'lucide-react';
+import { Database, Activity, AlertCircle, Moon, Sun } from 'lucide-react';
 import { SyncMonitor } from './components/SyncMonitor';
 import { AccountLookup } from './components/AccountLookup';
 import { TransactionExplorer } from './components/TransactionExplorer';
@@ -12,6 +12,16 @@ function App() {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [apiHealthy, setApiHealthy] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [darkMode, setDarkMode] = useState(true); // Dark mode by default
+
+  // Apply dark mode class to html element
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   // Check API health on mount
   useEffect(() => {
@@ -35,7 +45,7 @@ function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       {/* Header */}
       <header className="bg-mongodb-darkgreen text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -73,6 +83,19 @@ function App() {
               <div className="text-xs text-gray-400 border-l border-gray-600 pl-4">
                 Target SLA: 500 QPS | &lt;100ms p95
               </div>
+
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-2 rounded-lg hover:bg-mongodb-slate transition-colors"
+                title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {darkMode ? (
+                  <Sun className="w-5 h-5 text-gray-300" />
+                ) : (
+                  <Moon className="w-5 h-5 text-gray-300" />
+                )}
+              </button>
             </div>
           </div>
 
@@ -165,12 +188,12 @@ function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t mt-auto">
+      <footer className="bg-white dark:bg-gray-800 border-t dark:border-gray-700 mt-auto transition-colors">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between text-sm text-gray-500">
+          <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
             <div className="flex items-center gap-2">
               <span>MongoDB Atlas ODL Demo</span>
-              <span className="text-gray-300">|</span>
+              <span className="text-gray-300 dark:text-gray-600">|</span>
               <span>Competing against Databricks Lakebase</span>
             </div>
             <div className="flex items-center gap-4">

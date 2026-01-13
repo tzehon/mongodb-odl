@@ -70,7 +70,7 @@ export function AccountLookup({ onAccountSelect }) {
           <select
             value={selectedAccount}
             onChange={(e) => setSelectedAccount(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-mongodb-green focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-mongodb-green focus:border-transparent"
           >
             <option value="">Select an account...</option>
             {accounts.map((acc) => (
@@ -110,16 +110,16 @@ export function AccountLookup({ onAccountSelect }) {
             </div>
 
             {/* Account holder info */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-mongodb-green/20 flex items-center justify-center">
                   <User className="w-5 h-5 text-mongodb-leaf" />
                 </div>
                 <div>
-                  <div className="font-medium text-gray-900">
+                  <div className="font-medium text-gray-900 dark:text-white">
                     {accountData.accountHolder?.name}
                   </div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
                     {accountData.accountHolder?.email}
                   </div>
                 </div>
@@ -157,11 +157,11 @@ export function AccountLookup({ onAccountSelect }) {
 
             {/* Additional info */}
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="flex items-center gap-2 text-gray-600">
+              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                 <CreditCard className="w-4 h-4" />
                 <span>{accountData.accountNumber}</span>
               </div>
-              <div className="flex items-center gap-2 text-gray-600">
+              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                 <Building2 className="w-4 h-4" />
                 <span>{accountData.branch?.name}</span>
               </div>
@@ -169,7 +169,7 @@ export function AccountLookup({ onAccountSelect }) {
 
             {/* Statement period */}
             {accountData.statementPeriod && (
-              <div className="text-xs text-gray-500 border-t pt-3">
+              <div className="text-xs text-gray-500 dark:text-gray-400 border-t pt-3">
                 Statement period:{' '}
                 {new Date(accountData.statementPeriod.startDate).toLocaleDateString()} -{' '}
                 {new Date(accountData.statementPeriod.endDate).toLocaleDateString()}

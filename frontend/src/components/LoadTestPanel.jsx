@@ -214,14 +214,14 @@ export function LoadTestPanel() {
     >
       <div className="space-y-4">
         {/* Configuration */}
-        <div className="bg-gray-50 rounded-lg p-4">
+        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-3">
-            <Settings className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Test Configuration</span>
+            <Settings className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Test Configuration</span>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Concurrent Users
               </label>
               <input
@@ -234,13 +234,13 @@ export function LoadTestPanel() {
                   }))
                 }
                 disabled={isRunning}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm disabled:bg-gray-100"
                 min="1"
                 max="100"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Duration (seconds)
               </label>
               <input
@@ -253,13 +253,13 @@ export function LoadTestPanel() {
                   }))
                 }
                 disabled={isRunning}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm disabled:bg-gray-100"
                 min="5"
                 max="300"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Target QPS</label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Target QPS</label>
               <input
                 type="number"
                 value={config.targetQps}
@@ -270,7 +270,7 @@ export function LoadTestPanel() {
                   }))
                 }
                 disabled={isRunning}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm disabled:bg-gray-100"
                 min="10"
                 max="2000"
               />
@@ -332,12 +332,12 @@ export function LoadTestPanel() {
 
             <div className="grid grid-cols-4 gap-4 mb-4">
               <div>
-                <div className="text-xs text-gray-500">Total Requests</div>
-                <div className="text-xl font-bold text-gray-900">{results.totalRequests}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Total Requests</div>
+                <div className="text-xl font-bold text-gray-900 dark:text-white">{results.totalRequests}</div>
               </div>
               <div>
-                <div className="text-xs text-gray-500">Actual QPS</div>
-                <div className="text-xl font-bold text-gray-900">
+                <div className="text-xs text-gray-500 dark:text-gray-400">Actual QPS</div>
+                <div className="text-xl font-bold text-gray-900 dark:text-white">
                   {results.actualQps.toFixed(1)}
                   {results.actualQps >= config.targetQps * 0.9 ? (
                     <CheckCircle className="inline w-4 h-4 ml-1 text-green-500" />
@@ -347,8 +347,8 @@ export function LoadTestPanel() {
                 </div>
               </div>
               <div>
-                <div className="text-xs text-gray-500">P95 Latency</div>
-                <div className="text-xl font-bold text-gray-900">
+                <div className="text-xs text-gray-500 dark:text-gray-400">P95 Latency</div>
+                <div className="text-xl font-bold text-gray-900 dark:text-white">
                   {results.p95LatencyMs.toFixed(0)}ms
                   {results.p95LatencyMs < 100 ? (
                     <CheckCircle className="inline w-4 h-4 ml-1 text-green-500" />
@@ -358,8 +358,8 @@ export function LoadTestPanel() {
                 </div>
               </div>
               <div>
-                <div className="text-xs text-gray-500">Error Rate</div>
-                <div className="text-xl font-bold text-gray-900">
+                <div className="text-xs text-gray-500 dark:text-gray-400">Error Rate</div>
+                <div className="text-xl font-bold text-gray-900 dark:text-white">
                   {((results.failedRequests / results.totalRequests) * 100).toFixed(2)}%
                 </div>
               </div>
@@ -367,19 +367,19 @@ export function LoadTestPanel() {
 
             <div className="grid grid-cols-4 gap-4 text-sm border-t pt-3">
               <div>
-                <span className="text-gray-500">Avg Latency:</span>{' '}
+                <span className="text-gray-500 dark:text-gray-400">Avg Latency:</span>{' '}
                 <span className="font-medium">{results.averageLatencyMs.toFixed(1)}ms</span>
               </div>
               <div>
-                <span className="text-gray-500">P50:</span>{' '}
+                <span className="text-gray-500 dark:text-gray-400">P50:</span>{' '}
                 <span className="font-medium">{results.p50LatencyMs.toFixed(1)}ms</span>
               </div>
               <div>
-                <span className="text-gray-500">P99:</span>{' '}
+                <span className="text-gray-500 dark:text-gray-400">P99:</span>{' '}
                 <span className="font-medium">{results.p99LatencyMs.toFixed(1)}ms</span>
               </div>
               <div>
-                <span className="text-gray-500">Duration:</span>{' '}
+                <span className="text-gray-500 dark:text-gray-400">Duration:</span>{' '}
                 <span className="font-medium">{results.durationSeconds.toFixed(1)}s</span>
               </div>
             </div>
@@ -388,7 +388,7 @@ export function LoadTestPanel() {
 
         {/* Help text */}
         {!isRunning && !results && (
-          <div className="text-sm text-gray-500 text-center py-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
             Configure test parameters and click "Start Test" to run a load test.
             <br />
             Target SLA: {config.targetQps} QPS, &lt;100ms p95 latency

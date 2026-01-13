@@ -1,0 +1,157 @@
+[
+  {
+    "accountNumber": "SG-1234567890",
+    "accountHolder": {
+      "name": "Wei Ming Tan",
+      "email": "weiming.tan42@gmail.com",
+      "phone": "+65 91234567",
+      "address": {
+        "line1": "Blk 123 Orchard Road #12-345",
+        "line2": "",
+        "city": "Singapore",
+        "postalCode": "238888",
+        "country": "Singapore"
+      }
+    },
+    "accountType": "savings",
+    "branch": {
+      "code": "001",
+      "name": "Marina Bay Branch",
+      "region": "Central"
+    },
+    "currency": "SGD",
+    "statementPeriod": {
+      "startDate": "2024-01-01T00:00:00.000Z",
+      "endDate": "2024-01-31T23:59:59.999Z"
+    },
+    "openingBalance": 15000.00,
+    "closingBalance": 18542.35,
+    "transactions": [
+      {
+        "transactionId": "TXN2024010100001234",
+        "date": "2024-01-02T09:15:00.000Z",
+        "description": "GIRO SALARY - DBS BANK LTD",
+        "amount": 8500.00,
+        "type": "credit",
+        "category": "salary",
+        "merchant": "DBS BANK LTD",
+        "referenceNumber": "REF123456789",
+        "runningBalance": 23500.00,
+        "metadata": {
+          "channel": "GIRO",
+          "location": "Singapore"
+        }
+      },
+      {
+        "transactionId": "TXN2024010300002345",
+        "date": "2024-01-03T12:30:00.000Z",
+        "description": "NETS PURCHASE - FAIRPRICE FINEST",
+        "amount": 156.80,
+        "type": "debit",
+        "category": "groceries",
+        "merchant": "FairPrice Finest",
+        "referenceNumber": "REF234567890",
+        "runningBalance": 23343.20,
+        "metadata": {
+          "channel": "NETS",
+          "location": "Singapore"
+        }
+      },
+      {
+        "transactionId": "TXN2024010500003456",
+        "date": "2024-01-05T18:45:00.000Z",
+        "description": "GRAB*GRABTRANSPORT",
+        "amount": 15.50,
+        "type": "debit",
+        "category": "transport",
+        "merchant": "Grab",
+        "referenceNumber": "REF345678901",
+        "runningBalance": 23327.70,
+        "metadata": {
+          "channel": "Mobile",
+          "location": "Singapore"
+        }
+      },
+      {
+        "transactionId": "TXN2024010800004567",
+        "date": "2024-01-08T20:00:00.000Z",
+        "description": "NETFLIX.COM",
+        "amount": 16.98,
+        "type": "debit",
+        "category": "entertainment",
+        "merchant": "Netflix",
+        "referenceNumber": "REF456789012",
+        "runningBalance": 23310.72,
+        "metadata": {
+          "channel": "Internet Banking",
+          "location": "Singapore"
+        }
+      },
+      {
+        "transactionId": "TXN2024011000005678",
+        "date": "2024-01-10T11:20:00.000Z",
+        "description": "GRAB*GRABFOOD",
+        "amount": 25.90,
+        "type": "debit",
+        "category": "food_delivery",
+        "merchant": "GrabFood",
+        "referenceNumber": "REF567890123",
+        "runningBalance": 23284.82,
+        "metadata": {
+          "channel": "Mobile",
+          "location": "Singapore"
+        }
+      },
+      {
+        "transactionId": "TXN2024011500006789",
+        "date": "2024-01-15T09:00:00.000Z",
+        "description": "GIRO - SP SERVICES",
+        "amount": 180.45,
+        "type": "debit",
+        "category": "utilities",
+        "merchant": "SP Group",
+        "referenceNumber": "REF678901234",
+        "runningBalance": 23104.37,
+        "metadata": {
+          "channel": "GIRO",
+          "location": "Singapore"
+        }
+      },
+      {
+        "transactionId": "TXN2024012000007890",
+        "date": "2024-01-20T14:30:00.000Z",
+        "description": "PAYNOW TRANSFER FROM MEI LING",
+        "amount": 500.00,
+        "type": "credit",
+        "category": "transfer",
+        "merchant": "PayNow",
+        "referenceNumber": "REF789012345",
+        "runningBalance": 23604.37,
+        "metadata": {
+          "channel": "PayNow",
+          "location": "Singapore"
+        }
+      },
+      {
+        "transactionId": "TXN2024012500008901",
+        "date": "2024-01-25T16:00:00.000Z",
+        "description": "UNIQLO SINGAPORE",
+        "amount": 89.90,
+        "type": "debit",
+        "category": "shopping",
+        "merchant": "Uniqlo",
+        "referenceNumber": "REF890123456",
+        "runningBalance": 23514.47,
+        "metadata": {
+          "channel": "NETS",
+          "location": "Singapore"
+        }
+      }
+    ],
+    "statementMetadata": {
+      "generatedAt": "2024-02-01T00:00:00.000Z",
+      "version": 1,
+      "source": "databricks_lakehouse"
+    }
+  }
+]

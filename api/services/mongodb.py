@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from bson.decimal128 import Decimal128
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo import DESCENDING
 from pymongo.errors import ConnectionFailure, OperationFailure
@@ -10,6 +11,13 @@ from pymongo.errors import ConnectionFailure, OperationFailure
 from config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def decimal128_to_float(value) -> float:
+    """Convert Decimal128 or other numeric types to float."""
+    if isinstance(value, Decimal128):
+        return float(value.to_decimal())
+    return float(value) if value is not None else 0.0
 
 
 class MongoDBService:
@@ -103,7 +111,7 @@ class MongoDBService:
 
         return {
             "accountNumber": account_number,
-            "currentBalance": statement.get("closingBalance", 0),
+            "currentBalance": decimal128_to_float(statement.get("closingBalance", 0)),
             "currency": statement.get("currency", "SGD"),
             "asOf": statement.get("statementMetadata", {}).get("generatedAt", datetime.now()),
             "accountType": statement.get("accountType", "unknown")

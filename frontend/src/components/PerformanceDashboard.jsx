@@ -287,21 +287,46 @@ export function PerformanceDashboard() {
           </ResponsiveContainer>
         </div>
 
+        {/* DB Latency Stats */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+          <div className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">
+            MongoDB Query Latency (actual DB execution time)
+          </div>
+          <div className="grid grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-blue-600 dark:text-blue-400">DB QPS:</span>{' '}
+              <span className="font-bold text-blue-800 dark:text-blue-200">{metrics?.currentDbQps?.toFixed(1) || 0}</span>
+            </div>
+            <div>
+              <span className="text-blue-600 dark:text-blue-400">DB P50:</span>{' '}
+              <span className="font-bold text-blue-800 dark:text-blue-200">{metrics?.dbP50LatencyMs?.toFixed(0) || 0}ms</span>
+            </div>
+            <div>
+              <span className="text-blue-600 dark:text-blue-400">DB P95:</span>{' '}
+              <span className="font-bold text-blue-800 dark:text-blue-200">{metrics?.dbP95LatencyMs?.toFixed(0) || 0}ms</span>
+            </div>
+            <div>
+              <span className="text-blue-600 dark:text-blue-400">DB P99:</span>{' '}
+              <span className="font-bold text-blue-800 dark:text-blue-200">{metrics?.dbP99LatencyMs?.toFixed(0) || 0}ms</span>
+            </div>
+          </div>
+        </div>
+
         {/* Additional stats */}
         <div className="grid grid-cols-3 gap-4 text-sm border-t pt-4">
           <div>
             <span className="text-gray-500 dark:text-gray-400">Uptime:</span>{' '}
-            <span className="font-medium">
+            <span className="font-medium text-gray-900 dark:text-white">
               {Math.floor((metrics?.uptime || 0) / 60)}m {Math.floor((metrics?.uptime || 0) % 60)}s
             </span>
           </div>
           <div>
             <span className="text-gray-500 dark:text-gray-400">Error Rate:</span>{' '}
-            <span className="font-medium">{metrics?.errorRate?.toFixed(2) || 0}%</span>
+            <span className="font-medium text-gray-900 dark:text-white">{metrics?.errorRate?.toFixed(2) || 0}%</span>
           </div>
           <div>
             <span className="text-gray-500 dark:text-gray-400">Connections:</span>{' '}
-            <span className="font-medium">
+            <span className="font-medium text-gray-900 dark:text-white">
               {metrics?.connectionPoolStats?.current || 0} active
             </span>
           </div>

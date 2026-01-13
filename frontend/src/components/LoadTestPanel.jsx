@@ -234,7 +234,7 @@ export function LoadTestPanel() {
                   }))
                 }
                 disabled={isRunning}
-                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-700"
                 min="1"
                 max="100"
               />
@@ -253,7 +253,7 @@ export function LoadTestPanel() {
                   }))
                 }
                 disabled={isRunning}
-                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-700"
                 min="5"
                 max="300"
               />
@@ -270,7 +270,7 @@ export function LoadTestPanel() {
                   }))
                 }
                 disabled={isRunning}
-                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-700"
                 min="10"
                 max="2000"
               />
@@ -280,27 +280,27 @@ export function LoadTestPanel() {
 
         {/* Live stats during test */}
         {isRunning && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 animate-fade-in">
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 animate-fade-in">
             <div className="flex items-center gap-2 mb-3">
               <LoadingSpinner size="sm" />
-              <span className="text-sm font-medium text-blue-800">Test in progress...</span>
+              <span className="text-sm font-medium text-blue-800 dark:text-blue-300">Test in progress...</span>
             </div>
             <div className="grid grid-cols-4 gap-4">
               <div>
-                <div className="text-xs text-blue-600">Requests</div>
-                <div className="text-2xl font-bold text-blue-800">{liveStats.requests}</div>
+                <div className="text-xs text-blue-600 dark:text-blue-400">Requests</div>
+                <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">{liveStats.requests}</div>
               </div>
               <div>
-                <div className="text-xs text-blue-600">Current QPS</div>
-                <div className="text-2xl font-bold text-blue-800">{currentQps.toFixed(0)}</div>
+                <div className="text-xs text-blue-600 dark:text-blue-400">Current QPS</div>
+                <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">{currentQps.toFixed(0)}</div>
               </div>
               <div>
-                <div className="text-xs text-blue-600">P95 Latency</div>
-                <div className="text-2xl font-bold text-blue-800">{currentP95.toFixed(0)}ms</div>
+                <div className="text-xs text-blue-600 dark:text-blue-400">P95 Latency</div>
+                <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">{currentP95.toFixed(0)}ms</div>
               </div>
               <div>
-                <div className="text-xs text-blue-600">Failed</div>
-                <div className="text-2xl font-bold text-red-600">{liveStats.failed}</div>
+                <div className="text-xs text-blue-600 dark:text-blue-400">Failed</div>
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400">{liveStats.failed}</div>
               </div>
             </div>
           </div>
@@ -311,8 +311,8 @@ export function LoadTestPanel() {
           <div
             className={`rounded-lg p-4 border ${
               results.slaPassed
-                ? 'bg-green-50 border-green-200'
-                : 'bg-red-50 border-red-200'
+                ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800'
+                : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800'
             }`}
           >
             <div className="flex items-center gap-2 mb-4">
@@ -323,7 +323,7 @@ export function LoadTestPanel() {
               )}
               <span
                 className={`text-lg font-semibold ${
-                  results.slaPassed ? 'text-green-800' : 'text-red-800'
+                  results.slaPassed ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'
                 }`}
               >
                 Test {results.slaPassed ? 'PASSED' : 'FAILED'}

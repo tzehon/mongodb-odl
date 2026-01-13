@@ -52,7 +52,7 @@ export function PerformanceDashboard() {
   const qpsMet = metrics?.sla?.qpsMet ?? false;
   const latencyMet = metrics?.sla?.latencyMet ?? false;
   const overallPassed = metrics?.sla?.overallPassed ?? false;
-  const isIdle = (metrics?.currentQps || 0) < 1; // No load test running
+  const isIdle = (metrics?.currentQps || 0) < 10; // No active load test (background polling causes ~2-5 QPS)
 
   return (
     <Card
@@ -61,7 +61,7 @@ export function PerformanceDashboard() {
       action={
         <button
           onClick={reset}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 dark:bg-gray-700/50"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200"
         >
           <RefreshCw className="w-4 h-4" />
           Reset
@@ -73,10 +73,10 @@ export function PerformanceDashboard() {
         <div
           className={`rounded-lg p-4 ${
             isIdle
-              ? 'bg-gray-50 dark:bg-gray-700/50 border border-gray-200'
+              ? 'bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600'
               : overallPassed
-              ? 'bg-green-50 border border-green-200'
-              : 'bg-red-50 border border-red-200'
+              ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800'
+              : 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800'
           }`}
         >
           <div className="flex items-center justify-between">

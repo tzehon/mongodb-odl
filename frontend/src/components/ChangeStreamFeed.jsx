@@ -72,8 +72,8 @@ export function ChangeStreamFeed({ accountNumber }) {
             onClick={() => setIsPaused(!isPaused)}
             className={`p-1.5 rounded-lg border transition-colors ${
               isPaused
-                ? 'bg-yellow-50 border-yellow-200 text-yellow-700'
-                : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:bg-gray-700/50'
+                ? 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400'
+                : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300'
             }`}
             title={isPaused ? 'Resume' : 'Pause'}
           >
@@ -83,7 +83,7 @@ export function ChangeStreamFeed({ accountNumber }) {
           {/* Clear */}
           <button
             onClick={clearEvents}
-            className="p-1.5 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-700/50"
+            className="p-1.5 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300"
             title="Clear events"
           >
             <Trash2 className="w-4 h-4" />

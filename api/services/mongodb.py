@@ -1,6 +1,8 @@
 """MongoDB service for database operations."""
 
 import logging
+import time
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from bson.decimal128 import Decimal128
@@ -11,6 +13,27 @@ from pymongo.errors import ConnectionFailure, OperationFailure
 from config import settings
 
 logger = logging.getLogger(__name__)
+
+# Global reference to metrics collector (set during app startup)
+_metrics_collector = None
+
+
+def set_metrics_collector(collector):
+    """Set the global metrics collector reference."""
+    global _metrics_collector
+    _metrics_collector = collector
+
+
+@asynccontextmanager
+async def track_db_query():
+    """Context manager to track database query execution time."""
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        if _metrics_collector:
+            _metrics_collector.record_db_query(elapsed_ms)
 
 
 def decimal128_to_float(value) -> float:
@@ -81,10 +104,11 @@ class MongoDBService:
     async def get_latest_statement(self, account_number: str) -> Optional[Dict]:
         """Get the latest statement for an account."""
         collection = self.get_collection("account_statements")
-        statement = await collection.find_one(
-            {"accountNumber": account_number},
-            sort=[("statementPeriod.endDate", DESCENDING)]
-        )
+        async with track_db_query():
+            statement = await collection.find_one(
+                {"accountNumber": account_number},
+                sort=[("statementPeriod.endDate", DESCENDING)]
+            )
         return statement
 
     async def get_statements_by_date_range(
@@ -172,7 +196,8 @@ class MongoDBService:
 
         # Count total matching transactions
         count_pipeline = pipeline + [{"$count": "total"}]
-        count_result = await collection.aggregate(count_pipeline).to_list(1)
+        async with track_db_query():
+            count_result = await collection.aggregate(count_pipeline).to_list(1)
         total = count_result[0]["total"] if count_result else 0
 
         # Get paginated results
@@ -183,7 +208,8 @@ class MongoDBService:
             {"$replaceRoot": {"newRoot": "$transactions"}}
         ])
 
-        transactions = await collection.aggregate(pipeline).to_list(length=limit)
+        async with track_db_query():
+            transactions = await collection.aggregate(pipeline).to_list(length=limit)
 
         return {
             "items": transactions,
@@ -227,7 +253,7 @@ class MongoDBService:
                             "text": {
                                 "query": query,
                                 "path": "transactions.description",
-                                "fuzzy": {"maxEdits": 2} if fuzzy else {},
+                                **({"fuzzy": {"maxEdits": 2}} if fuzzy else {}),
                                 "score": {"boost": {"value": 2}}
                             }
                         },
@@ -235,7 +261,7 @@ class MongoDBService:
                             "text": {
                                 "query": query,
                                 "path": "transactions.merchant",
-                                "fuzzy": {"maxEdits": 1} if fuzzy else {},
+                                **({"fuzzy": {"maxEdits": 1}} if fuzzy else {}),
                                 "score": {"boost": {"value": 1.5}}
                             }
                         }
@@ -278,12 +304,15 @@ class MongoDBService:
         ]
 
         try:
-            results = await collection.aggregate(pipeline).to_list(length=limit)
+            async with track_db_query():
+                results = await collection.aggregate(pipeline).to_list(length=limit)
             return results
         except OperationFailure as e:
-            # Fallback to regex search if Atlas Search is not available
-            logger.warning(f"Atlas Search failed, falling back to regex: {e}")
-            return await self._fallback_search(account_number, query, limit)
+            # DO NOT silently fallback - make it clear Atlas Search is required
+            logger.error(f"Atlas Search FAILED: {e}")
+            raise OperationFailure(
+                f"Atlas Search index 'transaction_search' not working. Error: {e}"
+            )
 
     async def _fallback_search(
         self,
@@ -322,7 +351,8 @@ class MongoDBService:
             {"$limit": limit}
         ]
 
-        return await collection.aggregate(pipeline).to_list(length=limit)
+        async with track_db_query():
+            return await collection.aggregate(pipeline).to_list(length=limit)
 
     # =========================================================================
     # Metrics and Stats

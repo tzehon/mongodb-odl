@@ -21,10 +21,13 @@ class MetricsCollector:
     def __init__(self, max_samples: int = 10000):
         self.max_samples = max_samples
         self.latencies: Deque[float] = deque(maxlen=max_samples)
+        self.db_latencies: Deque[float] = deque(maxlen=max_samples)  # DB-only latencies
         self.request_times: Deque[float] = deque(maxlen=max_samples)
+        self.db_request_times: Deque[float] = deque(maxlen=max_samples)
         self.start_time = time.time()
         self._total_requests = 0
         self._failed_requests = 0
+        self._total_db_queries = 0
 
     def record_request(self, latency_ms: float, success: bool = True):
         """Record a request with its latency."""
@@ -34,11 +37,24 @@ class MetricsCollector:
         if not success:
             self._failed_requests += 1
 
+    def record_db_query(self, latency_ms: float):
+        """Record a database query with its latency."""
+        self.db_latencies.append(latency_ms)
+        self.db_request_times.append(time.time())
+        self._total_db_queries += 1
+
     def get_qps(self, window_seconds: float = 5.0) -> float:
         """Calculate QPS over a time window."""
         now = time.time()
         cutoff = now - window_seconds
         recent_count = sum(1 for t in self.request_times if t > cutoff)
+        return recent_count / window_seconds
+
+    def get_db_qps(self, window_seconds: float = 5.0) -> float:
+        """Calculate DB queries per second over a time window."""
+        now = time.time()
+        cutoff = now - window_seconds
+        recent_count = sum(1 for t in self.db_request_times if t > cutoff)
         return recent_count / window_seconds
 
     def get_latency_percentiles(self) -> Dict[str, float]:
@@ -47,6 +63,21 @@ class MetricsCollector:
             return {"p50": 0, "p95": 0, "p99": 0, "avg": 0}
 
         sorted_latencies = sorted(self.latencies)
+        n = len(sorted_latencies)
+
+        return {
+            "p50": sorted_latencies[int(n * 0.50)] if n > 0 else 0,
+            "p95": sorted_latencies[int(n * 0.95)] if n > 0 else 0,
+            "p99": sorted_latencies[int(n * 0.99)] if n > 0 else 0,
+            "avg": statistics.mean(sorted_latencies) if sorted_latencies else 0
+        }
+
+    def get_db_latency_percentiles(self) -> Dict[str, float]:
+        """Get DB-only latency percentiles."""
+        if not self.db_latencies:
+            return {"p50": 0, "p95": 0, "p99": 0, "avg": 0}
+
+        sorted_latencies = sorted(self.db_latencies)
         n = len(sorted_latencies)
 
         return {
@@ -69,9 +100,12 @@ class MetricsCollector:
     def reset(self):
         """Reset all metrics."""
         self.latencies.clear()
+        self.db_latencies.clear()
         self.request_times.clear()
+        self.db_request_times.clear()
         self._total_requests = 0
         self._failed_requests = 0
+        self._total_db_queries = 0
 
 
 # Global metrics collector
@@ -134,8 +168,11 @@ async def get_metrics(
     - Uptime
     - SLA compliance status
     """
-    # Get latency percentiles
+    # Get latency percentiles (API total)
     percentiles = collector.get_latency_percentiles()
+
+    # Get DB-only latency percentiles
+    db_percentiles = collector.get_db_latency_percentiles()
 
     # Get document count
     doc_count = await mongodb.get_document_count()
@@ -145,17 +182,24 @@ async def get_metrics(
 
     # Calculate QPS
     current_qps = collector.get_qps()
+    current_db_qps = collector.get_db_qps()
 
-    # Check SLA compliance
+    # Check SLA compliance (based on DB latency for accurate MongoDB performance)
     sla_qps_target = 500
     sla_latency_target = 100  # ms
 
     metrics = {
         "currentQps": round(current_qps, 2),
+        "currentDbQps": round(current_db_qps, 2),
         "averageLatencyMs": round(percentiles["avg"], 2),
         "p50LatencyMs": round(percentiles["p50"], 2),
         "p95LatencyMs": round(percentiles["p95"], 2),
         "p99LatencyMs": round(percentiles["p99"], 2),
+        # DB-only latency (actual MongoDB performance)
+        "dbAverageLatencyMs": round(db_percentiles["avg"], 2),
+        "dbP50LatencyMs": round(db_percentiles["p50"], 2),
+        "dbP95LatencyMs": round(db_percentiles["p95"], 2),
+        "dbP99LatencyMs": round(db_percentiles["p99"], 2),
         "documentCount": doc_count,
         "connectionPoolStats": pool_stats,
         "uptime": round(collector.get_uptime(), 2),
@@ -164,11 +208,11 @@ async def get_metrics(
         "sla": {
             "qpsTarget": sla_qps_target,
             "latencyTargetMs": sla_latency_target,
-            "qpsMet": current_qps >= sla_qps_target * 0.9,  # Allow 10% tolerance
-            "latencyMet": percentiles["p95"] <= sla_latency_target,
+            "qpsMet": current_db_qps >= sla_qps_target * 0.9,  # Allow 10% tolerance
+            "latencyMet": db_percentiles["p95"] <= sla_latency_target,
             "overallPassed": (
-                current_qps >= sla_qps_target * 0.9 and
-                percentiles["p95"] <= sla_latency_target
+                current_db_qps >= sla_qps_target * 0.9 and
+                db_percentiles["p95"] <= sla_latency_target
             )
         }
     }

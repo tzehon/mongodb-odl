@@ -15,6 +15,7 @@ from routers import accounts_router, transactions_router, search_router, metrics
 from routers.metrics import metrics_collector
 from websocket import websocket_router
 from services.mongodb import get_mongodb_service, close_mongodb_service
+from services import set_metrics_collector
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +31,10 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting ODL Banking API...")
     logger.info(f"Environment: {settings.environment}")
+
+    # Initialize metrics collector for DB latency tracking
+    set_metrics_collector(metrics_collector)
+    logger.info("Metrics collector initialized for DB latency tracking")
 
     # Connect to MongoDB
     try:

@@ -446,8 +446,23 @@ SLA Verification:
 | 2 | **Real-time sync demo** (Sync Monitor + data generator) | 5 min |
 | 3 | Account queries (balance, transactions, filters) | 5 min |
 | 4 | Full-text search ("fairprice", "grab") | 3 min |
-| 5 | Change Stream Feed (real-time events) | 3 min |
-| 6 | **Load test demo** (Locust → prove 500 QPS, <100ms) | 5 min |
+| 5 | Query Reference (show API → MongoDB query mapping) | 2 min |
+| 6 | Change Stream Feed (real-time events) | 2 min |
+| 7 | **Load test demo** (Locust → prove 500 QPS, <100ms) | 5 min |
+
+### Query Reference Tab
+
+The **Query Reference** tab shows how each API endpoint maps to its underlying MongoDB query:
+
+| Endpoint | MongoDB Operation | Index Used |
+|----------|-------------------|------------|
+| `GET /accounts/{account}/balance` | find + sort | `accountNumber_1_statementPeriod.endDate_-1` |
+| `GET /accounts/{account}/statements/latest` | find + sort | `accountNumber_1_statementPeriod.endDate_-1` |
+| `GET /accounts/{account}/summary` | find + sort + compute | `accountNumber_1_statementPeriod.endDate_-1` |
+| `GET /accounts/{account}/transactions` | aggregate | `accountNumber_1` |
+| `GET /accounts/{account}/transactions/search` | $search aggregate | Atlas Search: `transaction_search` |
+
+Click any endpoint to expand and see the full MongoDB query with copy-to-clipboard support.
 
 ---
 

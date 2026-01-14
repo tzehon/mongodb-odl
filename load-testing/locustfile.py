@@ -17,6 +17,7 @@ Benchmark mode is auto-enabled at test start. This:
 """
 
 import random
+import requests as req_lib
 from locust import HttpUser, task, between, events
 
 
@@ -62,6 +63,9 @@ class BankingAPIUser(HttpUser):
 
     def on_start(self):
         """Called when a simulated user starts."""
+        # Create a session for this user (better connection pooling)
+        self.session = req_lib.Session()
+
         if not BankingAPIUser.account_numbers:
             self._load_accounts()
 
@@ -70,13 +74,15 @@ class BankingAPIUser(HttpUser):
         else:
             self.account = None
 
+    def on_stop(self):
+        """Called when a simulated user stops."""
+        if hasattr(self, 'session'):
+            self.session.close()
+
     def _load_accounts(self):
         """Load available account numbers from the API."""
-        import requests
         try:
-            # Use raw requests library to avoid any Locust tracking
-            host = self.host
-            resp = requests.get(f"{host}/api/v1/accounts?limit=100", timeout=10)
+            resp = self.session.get(f"{self.host}/api/v1/accounts?limit=100", timeout=10)
             if resp.status_code == 200:
                 BankingAPIUser.account_numbers = resp.json()
         except Exception as e:
@@ -84,11 +90,9 @@ class BankingAPIUser(HttpUser):
 
     def _make_request(self, method, url, name, **kwargs):
         """Make a request and report DB execution time only."""
-        import requests
         try:
-            # Use raw requests library to completely bypass Locust's tracking
             full_url = f"{self.host}{url}"
-            resp = requests.request(method, full_url, timeout=30, **kwargs)
+            resp = self.session.request(method, full_url, timeout=30, **kwargs)
             response_length = len(resp.content) if resp.content else 0
 
             if resp.status_code == 200:
@@ -223,10 +227,12 @@ class HighThroughputUser(HttpUser):
     account_numbers = []
 
     def on_start(self):
+        # Create a session for this user
+        self.session = req_lib.Session()
+
         if not HighThroughputUser.account_numbers:
-            import requests
             try:
-                resp = requests.get(f"{self.host}/api/v1/accounts?limit=100", timeout=10)
+                resp = self.session.get(f"{self.host}/api/v1/accounts?limit=100", timeout=10)
                 if resp.status_code == 200:
                     HighThroughputUser.account_numbers = resp.json()
             except Exception:
@@ -237,12 +243,16 @@ class HighThroughputUser(HttpUser):
         else:
             self.account = None
 
+    def on_stop(self):
+        """Called when a simulated user stops."""
+        if hasattr(self, 'session'):
+            self.session.close()
+
     def _make_request(self, method, url, name, **kwargs):
         """Make a request and report DB execution time only."""
-        import requests
         try:
             full_url = f"{self.host}{url}"
-            resp = requests.request(method, full_url, timeout=30, **kwargs)
+            resp = self.session.request(method, full_url, timeout=30, **kwargs)
             response_length = len(resp.content) if resp.content else 0
 
             if resp.status_code == 200:
@@ -325,10 +335,9 @@ def on_test_start(environment, **kwargs):
     print("=" * 60)
 
     # Auto-enable benchmark mode
-    import requests
     try:
         host = environment.host or "http://api:8000"
-        resp = requests.post(f"{host}/api/v1/benchmark/start", timeout=5)
+        resp = req_lib.post(f"{host}/api/v1/benchmark/start", timeout=5)
         if resp.status_code == 200:
             print("Benchmark mode ENABLED - reporting DB execution time")
         else:
@@ -342,10 +351,9 @@ def on_test_start(environment, **kwargs):
 def on_test_stop(environment, **kwargs):
     """Called when load test ends."""
     # Disable benchmark mode
-    import requests
     try:
         host = environment.host or "http://api:8000"
-        requests.post(f"{host}/api/v1/benchmark/stop", timeout=5)
+        req_lib.post(f"{host}/api/v1/benchmark/stop", timeout=5)
         print("Benchmark mode disabled")
     except Exception:
         pass

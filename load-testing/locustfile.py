@@ -72,54 +72,54 @@ class BankingAPIUser(HttpUser):
 
     def _load_accounts(self):
         """Load available account numbers from the API."""
+        import requests
         try:
-            with self.client.get("/api/v1/accounts?limit=100", catch_response=True) as response:
-                response._manual_result = True  # Prevent auto-tracking
-                if response.status_code == 200:
-                    BankingAPIUser.account_numbers = response.json()
+            # Use raw requests library to avoid any Locust tracking
+            host = self.host
+            resp = requests.get(f"{host}/api/v1/accounts?limit=100", timeout=10)
+            if resp.status_code == 200:
+                BankingAPIUser.account_numbers = resp.json()
         except Exception as e:
             print(f"Failed to load accounts: {e}")
 
     def _make_request(self, method, url, name, **kwargs):
         """Make a request and report DB execution time only."""
+        import requests
         try:
-            with self.client.request(method, url, catch_response=True, **kwargs) as response:
-                # CRITICAL: Set this to prevent Locust from auto-tracking
-                response._manual_result = True
-                response_length = len(response.content) if response.content else 0
+            # Use raw requests library to completely bypass Locust's tracking
+            full_url = f"{self.host}{url}"
+            resp = requests.request(method, full_url, timeout=30, **kwargs)
+            response_length = len(resp.content) if resp.content else 0
 
-                if response.status_code == 200:
-                    db_time = get_db_exec_time(response)
-                    if db_time is not None and db_time > 0:
-                        # Fire ONLY our custom event with DB time
-                        events.request.fire(
-                            request_type=method,
-                            name=name,
-                            response_time=db_time,
-                            response_length=response_length,
-                            exception=None,
-                            context=self.context()
-                        )
-                    else:
-                        # DB time not available - report as failure
-                        events.request.fire(
-                            request_type=method,
-                            name=name,
-                            response_time=0,
-                            response_length=response_length,
-                            exception=Exception("DB execution time not available"),
-                            context=self.context()
-                        )
+            if resp.status_code == 200:
+                db_time = get_db_exec_time(resp)
+                if db_time is not None and db_time > 0:
+                    events.request.fire(
+                        request_type=method,
+                        name=name,
+                        response_time=db_time,
+                        response_length=response_length,
+                        exception=None,
+                        context=self.context()
+                    )
                 else:
-                    # HTTP error
                     events.request.fire(
                         request_type=method,
                         name=name,
                         response_time=0,
                         response_length=response_length,
-                        exception=Exception(f"HTTP {response.status_code}"),
+                        exception=Exception("No DB time"),
                         context=self.context()
                     )
+            else:
+                events.request.fire(
+                    request_type=method,
+                    name=name,
+                    response_time=0,
+                    response_length=response_length,
+                    exception=Exception(f"HTTP {resp.status_code}"),
+                    context=self.context()
+                )
 
         except Exception as e:
             events.request.fire(
@@ -222,11 +222,11 @@ class HighThroughputUser(HttpUser):
 
     def on_start(self):
         if not HighThroughputUser.account_numbers:
+            import requests
             try:
-                with self.client.get("/api/v1/accounts?limit=100", catch_response=True) as response:
-                    response._manual_result = True  # Prevent auto-tracking
-                    if response.status_code == 200:
-                        HighThroughputUser.account_numbers = response.json()
+                resp = requests.get(f"{self.host}/api/v1/accounts?limit=100", timeout=10)
+                if resp.status_code == 200:
+                    HighThroughputUser.account_numbers = resp.json()
             except Exception:
                 pass
 
@@ -237,41 +237,41 @@ class HighThroughputUser(HttpUser):
 
     def _make_request(self, method, url, name, **kwargs):
         """Make a request and report DB execution time only."""
+        import requests
         try:
-            with self.client.request(method, url, catch_response=True, **kwargs) as response:
-                # CRITICAL: Set this to prevent Locust from auto-tracking
-                response._manual_result = True
-                response_length = len(response.content) if response.content else 0
+            full_url = f"{self.host}{url}"
+            resp = requests.request(method, full_url, timeout=30, **kwargs)
+            response_length = len(resp.content) if resp.content else 0
 
-                if response.status_code == 200:
-                    db_time = get_db_exec_time(response)
-                    if db_time is not None and db_time > 0:
-                        events.request.fire(
-                            request_type=method,
-                            name=name,
-                            response_time=db_time,
-                            response_length=response_length,
-                            exception=None,
-                            context=self.context()
-                        )
-                    else:
-                        events.request.fire(
-                            request_type=method,
-                            name=name,
-                            response_time=0,
-                            response_length=response_length,
-                            exception=Exception("No DB time"),
-                            context=self.context()
-                        )
+            if resp.status_code == 200:
+                db_time = get_db_exec_time(resp)
+                if db_time is not None and db_time > 0:
+                    events.request.fire(
+                        request_type=method,
+                        name=name,
+                        response_time=db_time,
+                        response_length=response_length,
+                        exception=None,
+                        context=self.context()
+                    )
                 else:
                     events.request.fire(
                         request_type=method,
                         name=name,
                         response_time=0,
                         response_length=response_length,
-                        exception=Exception(f"HTTP {response.status_code}"),
+                        exception=Exception("No DB time"),
                         context=self.context()
                     )
+            else:
+                events.request.fire(
+                    request_type=method,
+                    name=name,
+                    response_time=0,
+                    response_length=response_length,
+                    exception=Exception(f"HTTP {resp.status_code}"),
+                    context=self.context()
+                )
 
         except Exception as e:
             events.request.fire(

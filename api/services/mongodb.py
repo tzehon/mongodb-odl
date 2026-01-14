@@ -91,12 +91,12 @@ async def track_db_query():
 
 async def get_explain_execution_time(db, collection_name: str, pipeline: list) -> float:
     """
-    Run explain on an aggregation pipeline and return executionTimeMillis.
-
-    This gives the actual MongoDB server execution time, excluding network latency.
+    Run explain on an aggregation pipeline and return execution time.
+    Uses wall-clock timing since explain with executionStats actually runs the query.
     """
     try:
-        # Use executionStats verbosity to get actual execution time
+        # Measure wall-clock time of explain (which actually executes the query)
+        start = time.perf_counter()
         explain_result = await db.command(
             'explain',
             {
@@ -106,41 +106,25 @@ async def get_explain_execution_time(db, collection_name: str, pipeline: list) -
             },
             verbosity='executionStats'
         )
+        exec_time = (time.perf_counter() - start) * 1000  # Convert to ms
 
-        # Extract execution time from explain output
-        exec_time = 0
+        # Try to get executionTimeMillis from result (more accurate if available)
+        reported_time = 0
 
-        # Standard structure with executionStats
         if 'executionStats' in explain_result:
-            exec_time = explain_result['executionStats'].get('executionTimeMillis', 0)
+            reported_time = explain_result['executionStats'].get('executionTimeMillis', 0)
 
-        # Stages structure (aggregation)
-        if exec_time == 0 and 'stages' in explain_result:
+        if reported_time == 0 and 'stages' in explain_result:
             for stage in explain_result.get('stages', []):
                 if '$cursor' in stage:
                     exec_stats = stage['$cursor'].get('executionStats', {})
-                    exec_time = exec_stats.get('executionTimeMillis', 0)
+                    reported_time = exec_stats.get('executionTimeMillis', 0)
                     break
-                # Also check for executionTimeMillisEstimate in stages
-                if 'executionTimeMillisEstimate' in stage:
-                    exec_time = max(exec_time, stage.get('executionTimeMillisEstimate', 0))
 
-        # Sharded cluster structure
-        if exec_time == 0 and 'shards' in explain_result:
-            for shard_name, shard_data in explain_result.get('shards', {}).items():
-                if 'executionStats' in shard_data:
-                    exec_time = max(exec_time, shard_data['executionStats'].get('executionTimeMillis', 0))
-                if 'stages' in shard_data:
-                    for stage in shard_data['stages']:
-                        if '$cursor' in stage:
-                            exec_stats = stage['$cursor'].get('executionStats', {})
-                            exec_time = max(exec_time, exec_stats.get('executionTimeMillis', 0))
-
-        if exec_time > 0:
-            logger.info(f"Explain execution time: {exec_time}ms")
-        else:
-            logger.warning(f"Explain returned 0ms - explain_result keys: {list(explain_result.keys())}")
-        return float(exec_time)
+        # Use reported time if available, otherwise use wall-clock
+        final_time = reported_time if reported_time > 0 else exec_time
+        logger.info(f"Agg explain: reported={reported_time}ms, wall={exec_time:.2f}ms, using={final_time:.2f}ms")
+        return float(final_time)
     except Exception as e:
         logger.warning(f"Could not get explain time: {e}")
         return 0.0
@@ -148,7 +132,8 @@ async def get_explain_execution_time(db, collection_name: str, pipeline: list) -
 
 async def get_find_explain_time(db, collection_name: str, filter_doc: dict, sort_doc: list = None) -> float:
     """
-    Run explain on a find query and return executionTimeMillis.
+    Run explain on a find query and return execution time.
+    Uses wall-clock timing since explain with executionStats actually runs the query.
     """
     try:
         # Build the find command
@@ -159,44 +144,28 @@ async def get_find_explain_time(db, collection_name: str, filter_doc: dict, sort
         if sort_doc:
             cmd['sort'] = dict(sort_doc)
 
+        # Measure wall-clock time of explain (which actually executes the query)
+        start = time.perf_counter()
         explain_result = await db.command('explain', cmd, verbosity='executionStats')
+        exec_time = (time.perf_counter() - start) * 1000  # Convert to ms
 
-        exec_time = 0
+        # Try to get executionTimeMillis from result (more accurate if available)
+        reported_time = 0
 
-        # Standard structure with executionStats
         if 'executionStats' in explain_result:
-            exec_time = explain_result['executionStats'].get('executionTimeMillis', 0)
+            reported_time = explain_result['executionStats'].get('executionTimeMillis', 0)
 
-        # Stages structure (MongoDB 7.0+ or Atlas)
-        if exec_time == 0 and 'stages' in explain_result:
+        if reported_time == 0 and 'stages' in explain_result:
             for stage in explain_result.get('stages', []):
                 if '$cursor' in stage:
                     exec_stats = stage['$cursor'].get('executionStats', {})
-                    exec_time = exec_stats.get('executionTimeMillis', 0)
+                    reported_time = exec_stats.get('executionTimeMillis', 0)
                     break
-                # Also check for executionTimeMillisEstimate in stages
-                if 'executionTimeMillisEstimate' in stage:
-                    exec_time = max(exec_time, stage.get('executionTimeMillisEstimate', 0))
 
-        # Sharded structure
-        if exec_time == 0 and 'shards' in explain_result:
-            for shard_data in explain_result.get('shards', {}).values():
-                if 'executionStats' in shard_data:
-                    exec_time = max(exec_time, shard_data['executionStats'].get('executionTimeMillis', 0))
-                if 'stages' in shard_data:
-                    for stage in shard_data['stages']:
-                        if '$cursor' in stage:
-                            exec_stats = stage['$cursor'].get('executionStats', {})
-                            exec_time = max(exec_time, exec_stats.get('executionTimeMillis', 0))
-
-        if exec_time > 0:
-            logger.info(f"Find explain execution time: {exec_time}ms")
-        else:
-            # Log full structure for debugging
-            logger.warning(f"Find explain returned 0ms - keys: {list(explain_result.keys())}")
-            if 'stages' in explain_result:
-                logger.warning(f"Stages structure: {explain_result['stages']}")
-        return float(exec_time)
+        # Use reported time if available, otherwise use wall-clock
+        final_time = reported_time if reported_time > 0 else exec_time
+        logger.info(f"Find explain: reported={reported_time}ms, wall={exec_time:.2f}ms, using={final_time:.2f}ms")
+        return float(final_time)
     except Exception as e:
         logger.warning(f"Could not get find explain time: {e}")
         return 0.0

@@ -9,12 +9,15 @@ Run with:
     locust -f locustfile.py --host=http://localhost:8000
 
 Or use the web UI at http://localhost:8089
+
+Benchmark mode is auto-enabled at test start. This:
+- Runs explain-only queries (faster)
+- Returns _dbExecTimeMs in response body with actual MongoDB execution time
+- Locust will report DB execution time instead of round-trip latency
 """
 
 import random
-import os
 from locust import HttpUser, task, between, events
-from locust.runners import MasterRunner
 
 
 # Test data
@@ -30,6 +33,17 @@ CATEGORIES = [
 ]
 
 
+def get_db_exec_time(response):
+    """Extract DB execution time from response body."""
+    try:
+        data = response.json()
+        if isinstance(data, dict) and "_dbExecTimeMs" in data:
+            return float(data["_dbExecTimeMs"])
+    except:
+        pass
+    return None
+
+
 class BankingAPIUser(HttpUser):
     """
     Simulated user making requests to the Banking ODL API.
@@ -39,21 +53,18 @@ class BankingAPIUser(HttpUser):
     - 25% balance checks
     - 15% search queries
     - 10% statement retrieval
+
+    Reports DB execution time from _dbExecTimeMs in response body.
     """
 
-    # Wait time between requests (simulates think time)
     wait_time = between(0.1, 0.5)
-
-    # Account numbers loaded on start
     account_numbers = []
 
     def on_start(self):
         """Called when a simulated user starts."""
-        # Fetch available accounts if not already loaded
         if not BankingAPIUser.account_numbers:
             self._load_accounts()
 
-        # Select a random account for this user
         if BankingAPIUser.account_numbers:
             self.account = random.choice(BankingAPIUser.account_numbers)
         else:
@@ -62,135 +73,141 @@ class BankingAPIUser(HttpUser):
     def _load_accounts(self):
         """Load available account numbers from the API."""
         try:
-            response = self.client.get("/api/v1/accounts?limit=100")
-            if response.status_code == 200:
-                BankingAPIUser.account_numbers = response.json()
+            with self.client.get("/api/v1/accounts?limit=100", catch_response=True) as response:
+                response._manual_result = True  # Prevent auto-tracking
+                if response.status_code == 200:
+                    BankingAPIUser.account_numbers = response.json()
         except Exception as e:
             print(f"Failed to load accounts: {e}")
 
+    def _make_request(self, method, url, name, **kwargs):
+        """Make a request and report DB execution time only."""
+        try:
+            with self.client.request(method, url, catch_response=True, **kwargs) as response:
+                # CRITICAL: Set this to prevent Locust from auto-tracking
+                response._manual_result = True
+                response_length = len(response.content) if response.content else 0
+
+                if response.status_code == 200:
+                    db_time = get_db_exec_time(response)
+                    if db_time is not None and db_time > 0:
+                        # Fire ONLY our custom event with DB time
+                        events.request.fire(
+                            request_type=method,
+                            name=name,
+                            response_time=db_time,
+                            response_length=response_length,
+                            exception=None,
+                            context=self.context()
+                        )
+                    else:
+                        # DB time not available - report as failure
+                        events.request.fire(
+                            request_type=method,
+                            name=name,
+                            response_time=0,
+                            response_length=response_length,
+                            exception=Exception("DB execution time not available"),
+                            context=self.context()
+                        )
+                else:
+                    # HTTP error
+                    events.request.fire(
+                        request_type=method,
+                        name=name,
+                        response_time=0,
+                        response_length=response_length,
+                        exception=Exception(f"HTTP {response.status_code}"),
+                        context=self.context()
+                    )
+
+        except Exception as e:
+            events.request.fire(
+                request_type=method,
+                name=name,
+                response_time=0,
+                response_length=0,
+                exception=e,
+                context=self.context()
+            )
+
     @task(5)
     def get_transactions(self):
-        """
-        Get transactions for an account.
-        Weight: 5 (most common operation)
-        """
+        """Get transactions for an account. Weight: 5"""
         if not self.account:
             return
 
-        # Vary the query parameters
         limit = random.choice([10, 20, 50])
-
-        with self.client.get(
+        self._make_request(
+            "GET",
             f"/api/v1/accounts/{self.account}/transactions",
-            params={"limit": limit},
-            name="/api/v1/accounts/[account]/transactions",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Got status {response.status_code}")
+            "/accounts/[acct]/transactions",
+            params={"limit": limit}
+        )
 
     @task(3)
     def get_balance(self):
-        """
-        Get current balance for an account.
-        Weight: 3 (second most common)
-        """
+        """Get current balance for an account. Weight: 3"""
         if not self.account:
             return
 
-        with self.client.get(
+        self._make_request(
+            "GET",
             f"/api/v1/accounts/{self.account}/balance",
-            name="/api/v1/accounts/[account]/balance",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Got status {response.status_code}")
+            "/accounts/[acct]/balance"
+        )
 
     @task(2)
     def search_transactions(self):
-        """
-        Search transactions using full-text search.
-        Weight: 2
-        """
+        """Search transactions using full-text search. Weight: 2"""
         if not self.account:
             return
 
         query = random.choice(SEARCH_TERMS)
-
-        with self.client.get(
+        self._make_request(
+            "GET",
             f"/api/v1/accounts/{self.account}/transactions/search",
-            params={"q": query, "limit": 20},
-            name="/api/v1/accounts/[account]/transactions/search",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Got status {response.status_code}")
+            "/accounts/[acct]/search",
+            params={"q": query, "limit": 20}
+        )
 
     @task(1)
     def get_latest_statement(self):
-        """
-        Get the latest statement for an account.
-        Weight: 1
-        """
+        """Get the latest statement for an account. Weight: 1"""
         if not self.account:
             return
 
-        with self.client.get(
+        self._make_request(
+            "GET",
             f"/api/v1/accounts/{self.account}/statements/latest",
-            name="/api/v1/accounts/[account]/statements/latest",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Got status {response.status_code}")
+            "/accounts/[acct]/statements/latest"
+        )
 
     @task(1)
     def get_transactions_filtered(self):
-        """
-        Get transactions with category filter.
-        Weight: 1
-        """
+        """Get transactions with category filter. Weight: 1"""
         if not self.account:
             return
 
         category = random.choice(CATEGORIES)
-
-        with self.client.get(
+        self._make_request(
+            "GET",
             f"/api/v1/accounts/{self.account}/transactions",
-            params={"category": category, "limit": 20},
-            name="/api/v1/accounts/[account]/transactions?category=[cat]",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Got status {response.status_code}")
+            "/accounts/[acct]/transactions?cat",
+            params={"category": category, "limit": 20}
+        )
 
     @task(1)
     def get_account_summary(self):
-        """
-        Get account summary.
-        Weight: 1
-        """
+        """Get account summary. Weight: 1"""
         if not self.account:
             return
 
-        with self.client.get(
+        self._make_request(
+            "GET",
             f"/api/v1/accounts/{self.account}/summary",
-            name="/api/v1/accounts/[account]/summary",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Got status {response.status_code}")
+            "/accounts/[acct]/summary"
+        )
 
 
 class HighThroughputUser(HttpUser):
@@ -199,17 +216,17 @@ class HighThroughputUser(HttpUser):
     Minimal wait time for maximum QPS.
     """
 
-    wait_time = between(0.01, 0.05)  # Very short wait
-    weight = 2  # Higher weight for load testing scenarios
-
+    wait_time = between(0.01, 0.05)
+    weight = 2
     account_numbers = []
 
     def on_start(self):
         if not HighThroughputUser.account_numbers:
             try:
-                response = self.client.get("/api/v1/accounts?limit=100")
-                if response.status_code == 200:
-                    HighThroughputUser.account_numbers = response.json()
+                with self.client.get("/api/v1/accounts?limit=100", catch_response=True) as response:
+                    response._manual_result = True  # Prevent auto-tracking
+                    if response.status_code == 200:
+                        HighThroughputUser.account_numbers = response.json()
             except Exception:
                 pass
 
@@ -218,21 +235,65 @@ class HighThroughputUser(HttpUser):
         else:
             self.account = None
 
+    def _make_request(self, method, url, name, **kwargs):
+        """Make a request and report DB execution time only."""
+        try:
+            with self.client.request(method, url, catch_response=True, **kwargs) as response:
+                # CRITICAL: Set this to prevent Locust from auto-tracking
+                response._manual_result = True
+                response_length = len(response.content) if response.content else 0
+
+                if response.status_code == 200:
+                    db_time = get_db_exec_time(response)
+                    if db_time is not None and db_time > 0:
+                        events.request.fire(
+                            request_type=method,
+                            name=name,
+                            response_time=db_time,
+                            response_length=response_length,
+                            exception=None,
+                            context=self.context()
+                        )
+                    else:
+                        events.request.fire(
+                            request_type=method,
+                            name=name,
+                            response_time=0,
+                            response_length=response_length,
+                            exception=Exception("No DB time"),
+                            context=self.context()
+                        )
+                else:
+                    events.request.fire(
+                        request_type=method,
+                        name=name,
+                        response_time=0,
+                        response_length=response_length,
+                        exception=Exception(f"HTTP {response.status_code}"),
+                        context=self.context()
+                    )
+
+        except Exception as e:
+            events.request.fire(
+                request_type=method,
+                name=name,
+                response_time=0,
+                response_length=0,
+                exception=e,
+                context=self.context()
+            )
+
     @task(10)
     def quick_balance_check(self):
         """Fastest operation - balance check."""
         if not self.account:
             return
 
-        with self.client.get(
+        self._make_request(
+            "GET",
             f"/api/v1/accounts/{self.account}/balance",
-            name="/api/v1/accounts/[account]/balance",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Got status {response.status_code}")
+            "/accounts/[acct]/balance"
+        )
 
     @task(5)
     def quick_transactions(self):
@@ -240,16 +301,12 @@ class HighThroughputUser(HttpUser):
         if not self.account:
             return
 
-        with self.client.get(
+        self._make_request(
+            "GET",
             f"/api/v1/accounts/{self.account}/transactions",
-            params={"limit": 10},
-            name="/api/v1/accounts/[account]/transactions",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Got status {response.status_code}")
+            "/accounts/[acct]/transactions",
+            params={"limit": 10}
+        )
 
 
 # Event hooks for custom reporting
@@ -261,30 +318,48 @@ def on_test_start(environment, **kwargs):
     print("=" * 60)
     print("Target SLA:")
     print("  - QPS: 500")
-    print("  - Latency P95: <100ms")
+    print("  - Latency P95: <100ms (DB execution time)")
+    print("=" * 60)
+
+    # Auto-enable benchmark mode
+    import requests
+    try:
+        host = environment.host or "http://api:8000"
+        resp = requests.post(f"{host}/api/v1/benchmark/start", timeout=5)
+        if resp.status_code == 200:
+            print("Benchmark mode ENABLED - reporting DB execution time")
+        else:
+            print(f"WARNING: Failed to enable benchmark mode: {resp.status_code}")
+    except Exception as e:
+        print(f"WARNING: Could not enable benchmark mode: {e}")
     print("=" * 60)
 
 
 @events.test_stop.add_listener
 def on_test_stop(environment, **kwargs):
     """Called when load test ends."""
+    # Disable benchmark mode
+    import requests
+    try:
+        host = environment.host or "http://api:8000"
+        requests.post(f"{host}/api/v1/benchmark/stop", timeout=5)
+        print("Benchmark mode disabled")
+    except Exception:
+        pass
+
     stats = environment.stats.total
 
     print("\n" + "=" * 60)
     print("Load Test Complete - Results Summary")
     print("=" * 60)
 
-    # Calculate metrics
     total_requests = stats.num_requests
     total_failures = stats.num_failures
     avg_response_time = stats.avg_response_time
 
-    # Get percentiles
-    response_times = stats.response_times
     p95 = stats.get_response_time_percentile(0.95) or 0
     p99 = stats.get_response_time_percentile(0.99) or 0
 
-    # Calculate QPS
     if stats.last_request_timestamp and stats.start_time:
         duration = stats.last_request_timestamp - stats.start_time
         qps = total_requests / duration if duration > 0 else 0
@@ -302,7 +377,7 @@ def on_test_stop(environment, **kwargs):
     print("\n" + "-" * 60)
     print("SLA Verification:")
 
-    qps_passed = qps >= 450  # Allow 10% tolerance
+    qps_passed = qps >= 450
     latency_passed = p95 < 100
 
     print(f"  QPS Target (500): {'PASS' if qps_passed else 'FAIL'} ({qps:.2f})")

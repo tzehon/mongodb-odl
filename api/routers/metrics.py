@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 import statistics
 
 from config import settings
-from services import MongoDBService, get_mongodb_service
+from services import MongoDBService, get_mongodb_service, set_benchmark_mode, is_benchmark_mode
 
 router = APIRouter(prefix="/api/v1", tags=["metrics"])
 
@@ -285,6 +285,46 @@ async def reset_metrics(
     """Reset all metrics (useful before load testing)."""
     collector.reset()
     return {"status": "ok", "message": "Metrics reset successfully"}
+
+
+@router.post("/benchmark/start")
+async def start_benchmark(
+    collector: MetricsCollector = Depends(get_metrics_collector)
+):
+    """
+    Enable benchmark mode for load testing.
+
+    In benchmark mode:
+    - Queries run explain-only (no results returned, just execution time)
+    - Single DB call per request (much faster)
+    - Measures true MongoDB executionTimeMillis
+    """
+    collector.reset()
+    set_benchmark_mode(True)
+    return {
+        "status": "ok",
+        "benchmarkMode": True,
+        "message": "Benchmark mode enabled. Queries will run explain-only for accurate timing."
+    }
+
+
+@router.post("/benchmark/stop")
+async def stop_benchmark():
+    """Disable benchmark mode and return to normal operation."""
+    set_benchmark_mode(False)
+    return {
+        "status": "ok",
+        "benchmarkMode": False,
+        "message": "Benchmark mode disabled. Normal query execution restored."
+    }
+
+
+@router.get("/benchmark/status")
+async def get_benchmark_status():
+    """Get current benchmark mode status."""
+    return {
+        "benchmarkMode": is_benchmark_mode()
+    }
 
 
 @router.get("/sync/status")

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from models import AccountStatement, AccountStatementSummary, BalanceResponse
 from services import MongoDBService, get_mongodb_service
+from utils import serialize_document, serialize_documents
 
 
 def to_float(value) -> float:
@@ -49,9 +50,8 @@ async def get_latest_statement(
             detail=f"No statement found for account {account_number}"
         )
 
-    # Remove MongoDB _id field
-    statement.pop("_id", None)
-    return statement
+    # Serialize BSON types (Decimal128, ObjectId) to JSON-compatible types
+    return serialize_document(statement)
 
 
 @router.get("/{account_number}/statements")
@@ -82,14 +82,11 @@ async def get_statements(
             detail=f"No statements found for account {account_number} in the specified date range"
         )
 
-    # Remove MongoDB _id fields
-    for stmt in statements:
-        stmt.pop("_id", None)
-
-    return statements
+    # Serialize BSON types (Decimal128, ObjectId) to JSON-compatible types
+    return serialize_documents(statements)
 
 
-@router.get("/{account_number}/balance", response_model=BalanceResponse)
+@router.get("/{account_number}/balance")
 async def get_balance(
     account_number: str,
     mongodb: MongoDBService = Depends(get_mongodb_service)
@@ -127,6 +124,10 @@ async def get_account_summary(
             status_code=404,
             detail=f"No data found for account {account_number}"
         )
+
+    # In benchmark mode, pass through the benchmark response with _dbExecTimeMs
+    if statement.get("_benchmark"):
+        return statement
 
     transactions = statement.get("transactions", [])
 

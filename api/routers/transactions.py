@@ -6,6 +6,7 @@ from bson.decimal128 import Decimal128
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from services import MongoDBService, get_mongodb_service
+from utils import serialize_documents
 
 
 def to_float(value) -> float:
@@ -53,6 +54,10 @@ async def get_transactions(
         tx_type=type
     )
 
+    # In benchmark mode, return the result directly (contains _dbExecTimeMs)
+    if result.get("_benchmark"):
+        return result
+
     if not result["items"] and result["total"] == 0:
         # Check if account exists at all
         statement = await mongodb.get_latest_statement(account_number)
@@ -62,6 +67,8 @@ async def get_transactions(
                 detail=f"Account {account_number} not found"
             )
 
+    # Serialize BSON types (Decimal128, ObjectId) to JSON-compatible types
+    result["items"] = serialize_documents(result["items"])
     return result
 
 
@@ -134,7 +141,7 @@ async def get_transaction_merchants(
     ]
 
     results = await collection.aggregate(pipeline).to_list(length=limit)
-    return {"merchants": results}
+    return {"merchants": serialize_documents(results)}
 
 
 @router.get("/{account_number}/transactions/stats")
@@ -274,4 +281,4 @@ async def get_transactions_by_category(
     ]
 
     results = await collection.aggregate(pipeline).to_list(length=100)
-    return {"breakdown": results}
+    return {"breakdown": serialize_documents(results)}

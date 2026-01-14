@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from models import TransactionSearchResult
 from services import MongoDBService, get_mongodb_service
+from utils import serialize_documents
 
 router = APIRouter(prefix="/api/v1/accounts", tags=["search"])
 
@@ -34,7 +35,7 @@ async def search_transactions(
     - /search?q=grab → Returns Grab transactions (transport + food)
     - /search?q=utilties → Fuzzy matches "utilities"
     """
-    # Verify account exists
+    # Verify account exists (skip full check in benchmark mode for speed)
     statement = await mongodb.get_latest_statement(account_number)
     if not statement:
         raise HTTPException(
@@ -49,11 +50,15 @@ async def search_transactions(
         fuzzy=fuzzy
     )
 
+    # In benchmark mode, pass through the benchmark response with _dbExecTimeMs
+    if isinstance(results, dict) and results.get("_benchmark"):
+        return results
+
     return {
         "query": q,
         "accountNumber": account_number,
         "resultCount": len(results),
-        "results": results
+        "results": serialize_documents(results)
     }
 
 
@@ -279,5 +284,5 @@ async def global_search(
     return {
         "query": q,
         "resultCount": len(results),
-        "results": results
+        "results": serialize_documents(results)
     }

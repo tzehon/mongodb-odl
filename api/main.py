@@ -15,7 +15,7 @@ from routers import accounts_router, transactions_router, search_router, metrics
 from routers.metrics import metrics_collector
 from websocket import websocket_router
 from services.mongodb import get_mongodb_service, close_mongodb_service
-from services import set_metrics_collector
+from services import set_metrics_collector, get_request_db_exec_time, set_current_request, clear_current_request, is_benchmark_mode
 
 # Configure logging
 logging.basicConfig(
@@ -92,6 +92,10 @@ async def timing_middleware(request: Request, call_next):
     """Middleware to track request timing for metrics."""
     start_time = time.time()
 
+    # Set current request reference so DB operations can store exec time
+    set_current_request(request)
+    request.state.db_exec_time = 0.0
+
     try:
         response = await call_next(request)
         success = response.status_code < 400
@@ -105,6 +109,14 @@ async def timing_middleware(request: Request, call_next):
         # Record metrics (skip health check and metrics endpoints)
         if not request.url.path.startswith(("/health", "/metrics", "/docs", "/redoc", "/openapi")):
             metrics_collector.record_request(latency_ms, success)
+
+        # Clear current request reference
+        clear_current_request()
+
+    # Add DB execution time header (for Locust to use in benchmark mode)
+    if is_benchmark_mode():
+        db_exec_time = getattr(request.state, 'db_exec_time', 0.0)
+        response.headers["X-DB-Execution-Time-Ms"] = str(round(db_exec_time, 2))
 
     return response
 

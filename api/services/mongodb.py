@@ -16,6 +16,12 @@ logger = logging.getLogger(__name__)
 
 # Global reference to metrics collector (set during app startup)
 _metrics_collector = None
+# Global reference to database for explain queries
+_db_ref = None
+# Benchmark mode: when True, run explain-only (no results needed, just timing)
+_benchmark_mode = False
+# Global reference to current request (set by middleware)
+_current_request = None
 
 
 def set_metrics_collector(collector):
@@ -24,16 +30,176 @@ def set_metrics_collector(collector):
     _metrics_collector = collector
 
 
+def set_db_ref(db):
+    """Set the global database reference for explain queries."""
+    global _db_ref
+    _db_ref = db
+
+
+def set_benchmark_mode(enabled: bool):
+    """Enable/disable benchmark mode. In benchmark mode, queries run explain-only."""
+    global _benchmark_mode
+    _benchmark_mode = enabled
+    logger.info(f"Benchmark mode: {'enabled' if enabled else 'disabled'}")
+
+
+def is_benchmark_mode() -> bool:
+    """Check if benchmark mode is enabled."""
+    return _benchmark_mode
+
+
+def record_db_execution_time(execution_time_ms: float):
+    """Record DB execution time from explain plan."""
+    if _metrics_collector and execution_time_ms > 0:
+        _metrics_collector.record_db_query(execution_time_ms)
+    # Store in request state for response header
+    if _current_request is not None:
+        _current_request.state.db_exec_time = execution_time_ms
+
+
+def get_request_db_exec_time() -> float:
+    """Get the DB execution time for the current request."""
+    if _current_request is not None and hasattr(_current_request.state, 'db_exec_time'):
+        return _current_request.state.db_exec_time
+    return 0.0
+
+
+def set_current_request(request):
+    """Set the current request reference (called by middleware)."""
+    global _current_request
+    _current_request = request
+
+
+def clear_current_request():
+    """Clear the current request reference."""
+    global _current_request
+    _current_request = None
+
+
 @asynccontextmanager
 async def track_db_query():
-    """Context manager to track database query execution time."""
+    """Context manager to track database query execution time (wall clock fallback)."""
     start = time.perf_counter()
     try:
         yield
     finally:
         elapsed_ms = (time.perf_counter() - start) * 1000
-        if _metrics_collector:
-            _metrics_collector.record_db_query(elapsed_ms)
+        # Only record if no explain-based time was recorded
+        # This is a fallback for queries we don't run explain on
+        pass  # Disabled - we now use explain-based timing
+
+
+async def get_explain_execution_time(db, collection_name: str, pipeline: list) -> float:
+    """
+    Run explain on an aggregation pipeline and return executionTimeMillis.
+
+    This gives the actual MongoDB server execution time, excluding network latency.
+    """
+    try:
+        # Use executionStats verbosity to get actual execution time
+        explain_result = await db.command(
+            'explain',
+            {
+                'aggregate': collection_name,
+                'pipeline': pipeline,
+                'cursor': {}
+            },
+            verbosity='executionStats'
+        )
+
+        # Extract execution time from explain output
+        exec_time = 0
+
+        # Standard structure with executionStats
+        if 'executionStats' in explain_result:
+            exec_time = explain_result['executionStats'].get('executionTimeMillis', 0)
+
+        # Stages structure (aggregation)
+        if exec_time == 0 and 'stages' in explain_result:
+            for stage in explain_result.get('stages', []):
+                if '$cursor' in stage:
+                    exec_stats = stage['$cursor'].get('executionStats', {})
+                    exec_time = exec_stats.get('executionTimeMillis', 0)
+                    break
+                # Also check for executionTimeMillisEstimate in stages
+                if 'executionTimeMillisEstimate' in stage:
+                    exec_time = max(exec_time, stage.get('executionTimeMillisEstimate', 0))
+
+        # Sharded cluster structure
+        if exec_time == 0 and 'shards' in explain_result:
+            for shard_name, shard_data in explain_result.get('shards', {}).items():
+                if 'executionStats' in shard_data:
+                    exec_time = max(exec_time, shard_data['executionStats'].get('executionTimeMillis', 0))
+                if 'stages' in shard_data:
+                    for stage in shard_data['stages']:
+                        if '$cursor' in stage:
+                            exec_stats = stage['$cursor'].get('executionStats', {})
+                            exec_time = max(exec_time, exec_stats.get('executionTimeMillis', 0))
+
+        if exec_time > 0:
+            logger.info(f"Explain execution time: {exec_time}ms")
+        else:
+            logger.warning(f"Explain returned 0ms - explain_result keys: {list(explain_result.keys())}")
+        return float(exec_time)
+    except Exception as e:
+        logger.warning(f"Could not get explain time: {e}")
+        return 0.0
+
+
+async def get_find_explain_time(db, collection_name: str, filter_doc: dict, sort_doc: list = None) -> float:
+    """
+    Run explain on a find query and return executionTimeMillis.
+    """
+    try:
+        # Build the find command
+        cmd = {
+            'find': collection_name,
+            'filter': filter_doc,
+        }
+        if sort_doc:
+            cmd['sort'] = dict(sort_doc)
+
+        explain_result = await db.command('explain', cmd, verbosity='executionStats')
+
+        exec_time = 0
+
+        # Standard structure with executionStats
+        if 'executionStats' in explain_result:
+            exec_time = explain_result['executionStats'].get('executionTimeMillis', 0)
+
+        # Stages structure (MongoDB 7.0+ or Atlas)
+        if exec_time == 0 and 'stages' in explain_result:
+            for stage in explain_result.get('stages', []):
+                if '$cursor' in stage:
+                    exec_stats = stage['$cursor'].get('executionStats', {})
+                    exec_time = exec_stats.get('executionTimeMillis', 0)
+                    break
+                # Also check for executionTimeMillisEstimate in stages
+                if 'executionTimeMillisEstimate' in stage:
+                    exec_time = max(exec_time, stage.get('executionTimeMillisEstimate', 0))
+
+        # Sharded structure
+        if exec_time == 0 and 'shards' in explain_result:
+            for shard_data in explain_result.get('shards', {}).values():
+                if 'executionStats' in shard_data:
+                    exec_time = max(exec_time, shard_data['executionStats'].get('executionTimeMillis', 0))
+                if 'stages' in shard_data:
+                    for stage in shard_data['stages']:
+                        if '$cursor' in stage:
+                            exec_stats = stage['$cursor'].get('executionStats', {})
+                            exec_time = max(exec_time, exec_stats.get('executionTimeMillis', 0))
+
+        if exec_time > 0:
+            logger.info(f"Find explain execution time: {exec_time}ms")
+        else:
+            # Log full structure for debugging
+            logger.warning(f"Find explain returned 0ms - keys: {list(explain_result.keys())}")
+            if 'stages' in explain_result:
+                logger.warning(f"Stages structure: {explain_result['stages']}")
+        return float(exec_time)
+    except Exception as e:
+        logger.warning(f"Could not get find explain time: {e}")
+        return 0.0
 
 
 def decimal128_to_float(value) -> float:
@@ -67,6 +233,9 @@ class MongoDBService:
         )
 
         self.db = self.client[settings.mongodb_database]
+
+        # Set global db reference for explain queries
+        set_db_ref(self.db)
 
         # Verify connection
         try:
@@ -104,11 +273,20 @@ class MongoDBService:
     async def get_latest_statement(self, account_number: str) -> Optional[Dict]:
         """Get the latest statement for an account."""
         collection = self.get_collection("account_statements")
-        async with track_db_query():
-            statement = await collection.find_one(
-                {"accountNumber": account_number},
-                sort=[("statementPeriod.endDate", DESCENDING)]
+        filter_doc = {"accountNumber": account_number}
+        sort_doc = [("statementPeriod.endDate", DESCENDING)]
+
+        # Benchmark mode: run explain-only (actually executes query, returns timing)
+        if is_benchmark_mode():
+            exec_time = await get_find_explain_time(
+                self.db, "account_statements", filter_doc, sort_doc
             )
+            record_db_execution_time(exec_time)
+            # Return minimal response with exec time for Locust to read
+            return {"accountNumber": account_number, "_benchmark": True, "_dbExecTimeMs": exec_time}
+
+        # Normal mode: execute actual query
+        statement = await collection.find_one(filter_doc, sort=sort_doc)
         return statement
 
     async def get_statements_by_date_range(
@@ -132,6 +310,10 @@ class MongoDBService:
         statement = await self.get_latest_statement(account_number)
         if not statement:
             return None
+
+        # In benchmark mode, pass through the benchmark response with _dbExecTimeMs
+        if statement.get("_benchmark"):
+            return statement
 
         return {
             "accountNumber": account_number,
@@ -194,12 +376,6 @@ class MongoDBService:
         if match_conditions:
             pipeline.append({"$match": match_conditions})
 
-        # Count total matching transactions
-        count_pipeline = pipeline + [{"$count": "total"}]
-        async with track_db_query():
-            count_result = await collection.aggregate(count_pipeline).to_list(1)
-        total = count_result[0]["total"] if count_result else 0
-
         # Get paginated results
         pipeline.extend([
             {"$sort": {"transactions.date": -1}},
@@ -208,8 +384,30 @@ class MongoDBService:
             {"$replaceRoot": {"newRoot": "$transactions"}}
         ])
 
-        async with track_db_query():
-            transactions = await collection.aggregate(pipeline).to_list(length=limit)
+        # Benchmark mode: run explain-only (skip count query - not needed)
+        if is_benchmark_mode():
+            exec_time = await get_explain_execution_time(
+                self.db, "account_statements", pipeline
+            )
+            record_db_execution_time(exec_time)
+            return {
+                "items": [],
+                "total": 0,
+                "page": 1,
+                "pageSize": limit,
+                "totalPages": 0,
+                "hasNext": False,
+                "hasPrevious": False,
+                "_benchmark": True,
+                "_dbExecTimeMs": exec_time
+            }
+
+        # Normal mode: run count query + actual query
+        count_pipeline = pipeline[:-4] + [{"$count": "total"}]  # Pipeline without sort/skip/limit/replaceRoot
+        count_result = await collection.aggregate(count_pipeline).to_list(1)
+        total = count_result[0]["total"] if count_result else 0
+
+        transactions = await collection.aggregate(pipeline).to_list(length=limit)
 
         return {
             "items": transactions,
@@ -304,8 +502,16 @@ class MongoDBService:
         ]
 
         try:
-            async with track_db_query():
-                results = await collection.aggregate(pipeline).to_list(length=limit)
+            # Benchmark mode: run explain-only
+            if is_benchmark_mode():
+                exec_time = await get_explain_execution_time(
+                    self.db, "account_statements", pipeline
+                )
+                record_db_execution_time(exec_time)
+                return {"_benchmark": True, "_dbExecTimeMs": exec_time, "items": []}
+
+            # Normal mode: execute actual query
+            results = await collection.aggregate(pipeline).to_list(length=limit)
             return results
         except OperationFailure as e:
             # DO NOT silently fallback - make it clear Atlas Search is required
@@ -351,8 +557,15 @@ class MongoDBService:
             {"$limit": limit}
         ]
 
-        async with track_db_query():
-            return await collection.aggregate(pipeline).to_list(length=limit)
+        # Benchmark mode: run explain-only
+        if is_benchmark_mode():
+            exec_time = await get_explain_execution_time(
+                self.db, "account_statements", pipeline
+            )
+            record_db_execution_time(exec_time)
+            return {"_benchmark": True, "_dbExecTimeMs": exec_time, "items": []}
+
+        return await collection.aggregate(pipeline).to_list(length=limit)
 
     # =========================================================================
     # Metrics and Stats

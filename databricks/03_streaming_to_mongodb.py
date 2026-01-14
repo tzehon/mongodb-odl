@@ -23,7 +23,6 @@ dbutils.widgets.text("catalog", "main", "Catalog Name")
 dbutils.widgets.text("schema", "banking_odl", "Schema/Database Name")
 dbutils.widgets.text("mongodb_database", "banking_odl", "MongoDB Database")
 dbutils.widgets.text("mongodb_collection", "account_statements", "MongoDB Collection")
-dbutils.widgets.text("trigger_interval", "5 seconds", "Trigger Interval")
 # Note: Update this path with your username if DBFS is disabled
 # Use format: /Workspace/Users/<your-email>/checkpoints/odl_streaming
 dbutils.widgets.text("checkpoint_path", "/Workspace/checkpoints/odl_streaming/account_statements", "Checkpoint Path")
@@ -36,14 +35,12 @@ catalog = dbutils.widgets.get("catalog")
 schema = dbutils.widgets.get("schema")
 mongodb_database = dbutils.widgets.get("mongodb_database")
 mongodb_collection = dbutils.widgets.get("mongodb_collection")
-trigger_interval = dbutils.widgets.get("trigger_interval")
 checkpoint_path = dbutils.widgets.get("checkpoint_path")
 start_fresh = dbutils.widgets.get("start_fresh") == "true"
 
 print(f"Configuration:")
 print(f"  Source: {catalog}.{schema}.account_statements")
 print(f"  Target: MongoDB {mongodb_database}.{mongodb_collection}")
-print(f"  Trigger Interval: {trigger_interval}")
 print(f"  Checkpoint Path: {checkpoint_path}")
 print(f"  Start Fresh: {start_fresh}")
 
@@ -90,7 +87,7 @@ if start_fresh:
 # COMMAND ----------
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_json, struct, current_timestamp, lit
+from pyspark.sql.functions import col, struct, current_timestamp, expr
 from pyspark.sql.types import *
 
 # Get or create Spark session
@@ -143,13 +140,17 @@ print(f"Schema: {delta_stream.schema}")
 
 # COMMAND ----------
 
-from pyspark.sql.functions import col, struct, array, when
-
 def transform_for_mongodb(df):
     """Transform DataFrame columns for MongoDB schema compatibility."""
 
+    # Filter for inserts and updates only (from Change Data Feed)
+    # _change_type can be: insert, update_preimage, update_postimage, delete
+    filtered = df.filter(
+        col("_change_type").isin(["insert", "update_postimage"])
+    )
+
     # Transform nested structures to match MongoDB schema
-    transformed = df \
+    transformed = filtered \
         .withColumn("accountNumber", col("account_number")) \
         .withColumn("accountHolder", struct(
             col("account_holder.name").alias("name"),
@@ -181,8 +182,36 @@ def transform_for_mongodb(df):
             col("statement_metadata.source").alias("source")
         ))
 
+    # Transform the transactions array to use camelCase
+    with_transactions = transformed.withColumn(
+        "transactions",
+        expr("""
+            transform(transactions, t -> struct(
+                t.transaction_id as transactionId,
+                t.date as date,
+                t.description as description,
+                t.amount as amount,
+                t.type as type,
+                t.category as category,
+                t.merchant as merchant,
+                t.reference_number as referenceNumber,
+                t.running_balance as runningBalance,
+                struct(
+                    t.metadata.channel as channel,
+                    t.metadata.location as location
+                ) as metadata
+            ))
+        """)
+    )
+
+    # Add sync timestamp - when data is written to MongoDB
+    # This is used to calculate end-to-end latency: _syncedAt - statementMetadata.generatedAt
+    with_sync_time = with_transactions.withColumn(
+        "_syncedAt", current_timestamp()
+    )
+
     # Select only the MongoDB-formatted columns
-    result = transformed.select(
+    result = with_sync_time.select(
         "accountNumber",
         "accountHolder",
         "accountType",
@@ -191,8 +220,9 @@ def transform_for_mongodb(df):
         "statementPeriod",
         "openingBalance",
         "closingBalance",
-        "transactions",  # Keep transactions array as-is for now
+        "transactions",
         "statementMetadata",
+        "_syncedAt",
         "_created_at",
         "_updated_at"
     )
@@ -202,114 +232,34 @@ def transform_for_mongodb(df):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Write Stream to MongoDB using foreachBatch
-# MAGIC
-# MAGIC Using foreachBatch allows us to:
-# MAGIC - Handle upserts (update existing documents or insert new ones)
-# MAGIC - Transform data within each micro-batch
-# MAGIC - Handle errors gracefully
-
-# COMMAND ----------
-
-from pyspark.sql.functions import expr, transform, struct, col
-
-def write_to_mongodb(batch_df, batch_id):
-    """Write a micro-batch to MongoDB with upsert logic."""
-    from datetime import datetime, timezone
-
-    if batch_df.isEmpty():
-        print(f"Batch {batch_id}: Empty batch, skipping")
-        return
-
-    # Capture batch start time (T1) - when Spark starts processing this batch
-    batch_start_time = datetime.now(timezone.utc)
-
-    record_count = batch_df.count()
-    print(f"Batch {batch_id}: Processing {record_count} records...")
-
-    try:
-        # Filter for inserts and updates (from Change Data Feed)
-        # _change_type can be: insert, update_preimage, update_postimage, delete
-        actionable_df = batch_df.filter(
-            col("_change_type").isin(["insert", "update_postimage"])
-        )
-
-        if actionable_df.isEmpty():
-            print(f"Batch {batch_id}: No actionable changes (inserts/updates)")
-            return
-
-        # Transform the data for MongoDB schema
-        transformed_df = transform_for_mongodb(actionable_df)
-
-        # Transform the transactions array to use camelCase
-        # This requires a more complex transformation
-        final_df = transformed_df.withColumn(
-            "transactions",
-            expr("""
-                transform(transactions, t -> struct(
-                    t.transaction_id as transactionId,
-                    t.date as date,
-                    t.description as description,
-                    t.amount as amount,
-                    t.type as type,
-                    t.category as category,
-                    t.merchant as merchant,
-                    t.reference_number as referenceNumber,
-                    t.running_balance as runningBalance,
-                    struct(
-                        t.metadata.channel as channel,
-                        t.metadata.location as location
-                    ) as metadata
-                ))
-            """)
-        ).withColumn(
-            # T1: When Spark batch started processing
-            "_batchStartTime", lit(batch_start_time.isoformat())
-        ).withColumn(
-            # T2: When data is about to be written to MongoDB
-            # Pipeline Latency = _processedAt - _batchStartTime
-            "_processedAt", lit(datetime.now(timezone.utc).isoformat())
-        )
-
-        # Write to MongoDB using the Spark Connector
-        final_df.write \
-            .format("mongodb") \
-            .option("connection.uri", mongodb_uri) \
-            .option("database", mongodb_database) \
-            .option("collection", mongodb_collection) \
-            .option("operationType", "update") \
-            .option("upsertDocument", "true") \
-            .option("idFieldList", "accountNumber,statementPeriod.startDate") \
-            .mode("append") \
-            .save()
-
-        print(f"Batch {batch_id}: Successfully wrote {actionable_df.count()} records to MongoDB")
-
-    except Exception as e:
-        print(f"Batch {batch_id}: Error writing to MongoDB: {e}")
-        # In production, you might want to write to a dead letter queue
-        # For now, we'll re-raise to fail the batch
-        raise
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC ## Start the Streaming Query
+# MAGIC
+# MAGIC Using native MongoDB Spark Connector streaming mode for optimal performance.
+# MAGIC Data is processed as soon as it arrives (no artificial delays).
 
 # COMMAND ----------
 
-# Start the streaming query
-query = delta_stream \
+# Transform the stream
+transformed_stream = transform_for_mongodb(delta_stream)
+
+# Start the streaming query using native MongoDB sink
+query = transformed_stream \
     .writeStream \
-    .foreachBatch(write_to_mongodb) \
+    .format("mongodb") \
+    .option("spark.mongodb.connection.uri", mongodb_uri) \
+    .option("spark.mongodb.database", mongodb_database) \
+    .option("spark.mongodb.collection", mongodb_collection) \
+    .option("spark.mongodb.operationType", "update") \
+    .option("spark.mongodb.upsertDocument", "true") \
+    .option("spark.mongodb.idFieldList", "accountNumber,statementPeriod.startDate") \
     .option("checkpointLocation", checkpoint_path) \
-    .trigger(processingTime=trigger_interval) \
     .queryName("odl_mongodb_streaming") \
     .start()
 
 print(f"Streaming query started: {query.name}")
 print(f"Query ID: {query.id}")
 print(f"Status: {query.status}")
+print(f"\nStreaming mode: Native MongoDB sink (processes data as it arrives)")
 
 # COMMAND ----------
 
@@ -359,90 +309,6 @@ print(f"Stream is active: {query.isActive}")
 # To see all active streams:
 for q in spark.streams.active:
     print(f"Active stream: {q.name} (ID: {q.id})")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Error Handling and Dead Letter Queue
-# MAGIC
-# MAGIC For production deployments, implement a dead letter queue pattern:
-
-# COMMAND ----------
-
-# Dead Letter Queue implementation (for production use)
-def write_to_mongodb_with_dlq(batch_df, batch_id):
-    """Write to MongoDB with dead letter queue for failed records."""
-    from datetime import datetime, timezone
-
-    if batch_df.isEmpty():
-        return
-
-    # Capture batch start time (T1)
-    batch_start_time = datetime.now(timezone.utc)
-
-    # Filter actionable changes
-    actionable_df = batch_df.filter(
-        col("_change_type").isin(["insert", "update_postimage"])
-    )
-
-    if actionable_df.isEmpty():
-        return
-
-    try:
-        # Transform and write
-        transformed_df = transform_for_mongodb(actionable_df)
-
-        final_df = transformed_df.withColumn(
-            "transactions",
-            expr("""
-                transform(transactions, t -> struct(
-                    t.transaction_id as transactionId,
-                    t.date as date,
-                    t.description as description,
-                    t.amount as amount,
-                    t.type as type,
-                    t.category as category,
-                    t.merchant as merchant,
-                    t.reference_number as referenceNumber,
-                    t.running_balance as runningBalance,
-                    struct(
-                        t.metadata.channel as channel,
-                        t.metadata.location as location
-                    ) as metadata
-                ))
-            """)
-        ).withColumn(
-            # T1: When Spark batch started processing
-            "_batchStartTime", lit(batch_start_time.isoformat())
-        ).withColumn(
-            # T2: When data is about to be written to MongoDB
-            "_processedAt", lit(datetime.now(timezone.utc).isoformat())
-        )
-
-        final_df.write \
-            .format("mongodb") \
-            .option("connection.uri", mongodb_uri) \
-            .option("database", mongodb_database) \
-            .option("collection", mongodb_collection) \
-            .option("operationType", "update") \
-            .option("upsertDocument", "true") \
-            .option("idFieldList", "accountNumber,statementPeriod.startDate") \
-            .mode("append") \
-            .save()
-
-    except Exception as e:
-        print(f"Error in batch {batch_id}, writing to DLQ: {e}")
-
-        # Write failed records to dead letter queue (Delta table)
-        dlq_df = actionable_df \
-            .withColumn("_error_message", lit(str(e))) \
-            .withColumn("_error_timestamp", current_timestamp()) \
-            .withColumn("_batch_id", lit(batch_id))
-
-        dlq_df.write \
-            .format("delta") \
-            .mode("append") \
-            .saveAsTable("account_statements_dlq")
 
 # COMMAND ----------
 

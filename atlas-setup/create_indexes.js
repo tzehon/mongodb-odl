@@ -147,10 +147,27 @@ db.account_statements.createIndex(
 print("   ✓ statement_metadata created");
 
 // ============================================================================
+// Sync Timestamp Index (for sync status monitoring)
+// Used for: Finding most recently synced documents
+// Query pattern: db.account_statements.find().sort({ "_syncedAt": -1 }).limit(1)
+// ============================================================================
+print("\n8. Creating synced_at index...");
+db.account_statements.createIndex(
+  {
+    "_syncedAt": -1
+  },
+  {
+    name: "synced_at",
+    background: true
+  }
+);
+print("   ✓ synced_at created");
+
+// ============================================================================
 // Compound Index for Complex Queries
 // Used for: Common dashboard queries combining account + type + date
 // ============================================================================
-print("\n8. Creating compound_dashboard index...");
+print("\n9. Creating compound_dashboard index...");
 db.account_statements.createIndex(
   {
     "accountNumber": 1,

@@ -91,40 +91,35 @@ Follow these steps in order:
 Delta Lake ──CDF──▶ Spark ──Connector──▶ MongoDB ──Change Streams──▶ FastAPI ──WebSocket──▶ Browser
 ```
 
-### Pipeline Latency Measurement
+### Sync Latency Measurement
 
-The dashboard shows **Pipeline Latency** - the actual time Spark takes to process a batch and write to MongoDB.
+The dashboard shows **Sync Latency** - the end-to-end time from data generation in Databricks to write in MongoDB Atlas.
 
 ```
                                       TIMELINE
 ────────────────────────────────────────────────────────────────────────▶ time
 
-   T0               T1                       T2
-   │                │                        │
-   ▼                ▼                        ▼
-┌───────┐     ┌───────────┐          ┌─────────────┐     ┌──────────────┐
-│ Data  │     │   Spark   │          │   MongoDB   │     │  Dashboard   │
-│Created│     │   Batch   │          │    Write    │────▶│ (via Change  │
-│       │     │  Starts   │          │  Complete   │     │   Streams)   │
-└───────┘     └───────────┘          └─────────────┘     └──────────────┘
-   │                │                        │                   │
-   │◄──────────────►│◄──────────────────────►│                   │
-   │  Trigger Wait  │       Pipeline         │     Real-time     │
-   │   (excluded)   │       Latency          │    (no polling)   │
-   │                │      (measured)        │                   │
+   T0 (generatedAt)                              T1 (_syncedAt)
+   │                                             │
+   ▼                                             ▼
+┌───────────────┐     ┌───────────────┐     ┌─────────────┐     ┌──────────────┐
+│ Data Created  │     │    Spark      │     │   MongoDB   │     │  Dashboard   │
+│ in Delta Lake │────▶│   Streaming   │────▶│    Write    │────▶│ (via Change  │
+│               │     │               │     │             │     │   Streams)   │
+└───────────────┘     └───────────────┘     └─────────────┘     └──────────────┘
+   │                                             │                     │
+   │◄───────────────────────────────────────────►│                     │
+   │              Sync Latency                   │      Real-time      │
+   │              (measured)                     │     (no polling)    │
 ```
 
 **How it works:**
-1. **T0**: Data created in Delta Lake (has `generatedAt` timestamp)
-2. **T1**: Spark batch starts processing (captured as `_batchStartTime`)
-3. **T2**: Spark writes to MongoDB (captured as `_processedAt`)
+1. **T0**: Data created in Delta Lake with `generatedAt` timestamp
+2. **Spark Streaming**: Processes data as it arrives (native streaming mode, no fixed intervals)
+3. **T1**: Data written to MongoDB with `_syncedAt` timestamp
 4. **Dashboard**: Receives update via Change Streams (real-time, no polling)
 
-**Pipeline Latency = T2 - T1** (actual Spark processing + MongoDB write time)
-
-This measures exactly how long Spark takes to process and write data:
-- Excludes trigger interval wait time (T0 → T1)
-- Change Streams push updates to dashboard in real-time (no polling delay)
+**Sync Latency = T1 - T0** (end-to-end from data creation to MongoDB)
 
 ---
 
@@ -362,7 +357,7 @@ Expected response:
 
 - "Data written to Databricks appears in MongoDB within **5-10 seconds**"
 - "Change Streams provide **real-time CDC** - no polling required"
-- "The streaming notebook checks for changes every 5 seconds (configurable)"
+- "Spark Streaming processes data as it arrives (no fixed polling interval)"
 
 ---
 

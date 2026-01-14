@@ -336,20 +336,19 @@ async def get_sync_status(
 
     Shows information about the latest synced data from Databricks.
     Returns:
-    - pipelineLatencySeconds: True pipeline latency (time from Spark batch processing to detection)
+    - syncLatencySeconds: End-to-end latency (time from data generation to MongoDB write)
     - timeSinceLastSync: Seconds since the last document was synced (for idle detection)
     """
     collection = mongodb.get_collection("account_statements")
 
-    # Get the most recently processed document (sorted by _processedAt)
+    # Get the most recently synced document (sorted by _syncedAt)
     latest = await collection.find_one(
         {},
-        sort=[("_processedAt", -1)],
+        sort=[("_syncedAt", -1)],
         projection={
             "accountNumber": 1,
             "statementMetadata": 1,
-            "_batchStartTime": 1,
-            "_processedAt": 1,
+            "_syncedAt": 1,
             "_updated_at": 1
         }
     )
@@ -359,53 +358,45 @@ async def get_sync_status(
 
     # Get timestamps
     last_generated_at = None
-    batch_start_time = None
-    processed_at = None
-    pipeline_latency = None
+    synced_at = None
+    sync_latency = None
 
     if latest:
-        # generatedAt - when data was created in Databricks (for idle detection)
+        # generatedAt - when data was created in Databricks
         if latest.get("statementMetadata", {}).get("generatedAt"):
             last_generated_at = latest["statementMetadata"]["generatedAt"]
             if not isinstance(last_generated_at, datetime):
                 last_generated_at = None
 
-        # _batchStartTime (T1) - when Spark batch started processing
-        if latest.get("_batchStartTime"):
-            batch_start_str = latest["_batchStartTime"]
-            if isinstance(batch_start_str, str):
+        # _syncedAt - when data was written to MongoDB
+        if latest.get("_syncedAt"):
+            synced_at_val = latest["_syncedAt"]
+            if isinstance(synced_at_val, str):
                 try:
-                    batch_start_time = datetime.fromisoformat(batch_start_str.replace('Z', '+00:00'))
+                    synced_at = datetime.fromisoformat(synced_at_val.replace('Z', '+00:00'))
                 except ValueError:
-                    batch_start_time = None
-            elif isinstance(batch_start_str, datetime):
-                batch_start_time = batch_start_str
+                    synced_at = None
+            elif isinstance(synced_at_val, datetime):
+                synced_at = synced_at_val
 
-        # _processedAt (T2) - when data was written to MongoDB
-        if latest.get("_processedAt"):
-            processed_str = latest["_processedAt"]
-            if isinstance(processed_str, str):
-                try:
-                    processed_at = datetime.fromisoformat(processed_str.replace('Z', '+00:00'))
-                except ValueError:
-                    processed_at = None
-            elif isinstance(processed_str, datetime):
-                processed_at = processed_str
-
-        # Calculate Pipeline Latency = T2 - T1 (batch processing + MongoDB write time)
-        if batch_start_time and processed_at:
-            pipeline_latency = (processed_at - batch_start_time).total_seconds()
+        # Calculate Sync Latency = _syncedAt - generatedAt (end-to-end)
+        if last_generated_at and synced_at:
+            # Ensure both are timezone-aware
+            if last_generated_at.tzinfo is None:
+                last_generated_at = last_generated_at.replace(tzinfo=timezone.utc)
+            if synced_at.tzinfo is None:
+                synced_at = synced_at.replace(tzinfo=timezone.utc)
+            sync_latency = (synced_at - last_generated_at).total_seconds()
 
     # Update tracker for change detection
-    sync_latency_tracker.update(doc_count, processed_at)
+    sync_latency_tracker.update(doc_count, synced_at)
 
-    # Calculate time since last sync (for idle detection) - uses generatedAt
+    # Calculate time since last sync (for idle detection)
     time_since_last_sync = None
-    if last_generated_at:
-        # Ensure last_generated_at is timezone-aware for comparison
-        if last_generated_at.tzinfo is None:
-            last_generated_at = last_generated_at.replace(tzinfo=timezone.utc)
-        time_since_last_sync = (datetime.now(timezone.utc) - last_generated_at).total_seconds()
+    if synced_at:
+        if synced_at.tzinfo is None:
+            synced_at = synced_at.replace(tzinfo=timezone.utc)
+        time_since_last_sync = (datetime.now(timezone.utc) - synced_at).total_seconds()
 
     return {
         "status": "connected",
@@ -413,15 +404,11 @@ async def get_sync_status(
         "lastSyncedDocument": {
             "accountNumber": latest.get("accountNumber") if latest else None,
             "generatedAt": last_generated_at.isoformat() if last_generated_at else None,
-            "batchStartTime": batch_start_time.isoformat() if batch_start_time else None,
-            "processedAt": processed_at.isoformat() if processed_at else None,
+            "syncedAt": synced_at.isoformat() if synced_at else None,
             "source": latest.get("statementMetadata", {}).get("source") if latest else None
         },
-        # Pipeline Latency = T2 - T1 (Spark batch processing + MongoDB write)
-        # This is the actual time Spark took to process and write the data
-        "pipelineLatencySeconds": round(pipeline_latency, 2) if pipeline_latency is not None else None,
-        # Keep syncLatencySeconds for backward compatibility
-        "syncLatencySeconds": round(pipeline_latency, 2) if pipeline_latency is not None else None,
+        # Sync Latency = _syncedAt - generatedAt (end-to-end from data creation to MongoDB)
+        "syncLatencySeconds": round(sync_latency, 2) if sync_latency is not None else None,
         # Time since last sync (for idle detection)
         "timeSinceLastSync": round(time_since_last_sync, 2) if time_since_last_sync else None,
         "timestamp": datetime.now(timezone.utc).isoformat()

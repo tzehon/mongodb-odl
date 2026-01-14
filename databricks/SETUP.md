@@ -430,15 +430,14 @@ The streaming runs **continuously** using a micro-batch pattern:
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-1. **Every trigger interval** (default: 5 seconds), Spark checks Delta Lake for new changes
-2. **If changes exist**, it reads them, transforms them, and writes to MongoDB
-3. **If no changes**, it waits for the next interval
+1. **When data arrives**, Spark immediately processes it (no fixed polling interval)
+2. **Transforms** the data (rename columns to match MongoDB schema)
+3. **Writes** to MongoDB using the native Spark Connector streaming sink
 4. **Checkpoint** tracks progress - if the notebook restarts, it resumes where it left off
 5. **Runs until you stop it** by calling `query.stop()` or terminating the compute
 
 | Setting | What It Controls |
 |---------|------------------|
-| `trigger_interval` | How often to check for changes (e.g., "5 seconds") |
 | `checkpoint_path` | Where to save progress (survives restarts) |
 | `start_fresh` | If true, ignores checkpoint and reprocesses all data |
 
@@ -455,36 +454,29 @@ delta_stream = spark.readStream \
     .option("readChangeFeed", "true") \    # Track changes only
     .table("account_statements")
 
-# 2. PROCESS: For each micro-batch, transform and write to MongoDB
-def write_to_mongodb(batch_df, batch_id):
-    # Filter for inserts/updates (ignore deletes)
-    actionable = batch_df.filter(col("_change_type").isin(["insert", "update_postimage"]))
+# 2. TRANSFORM: Filter and rename columns for MongoDB schema
+transformed_stream = delta_stream \
+    .filter(col("_change_type").isin(["insert", "update_postimage"])) \
+    .transform(transform_for_mongodb)  # snake_case -> camelCase
 
-    # Transform snake_case to camelCase for MongoDB
-    transformed = transform_for_mongodb(actionable)
-
-    # Write to MongoDB using the Spark Connector
-    transformed.write \
-        .format("mongodb") \
-        .option("connection.uri", mongodb_uri) \
-        .option("database", "banking_odl") \
-        .option("collection", "account_statements") \
-        .save()
-
-# 3. RUN: Start the streaming query (runs forever)
-query = delta_stream \
+# 3. WRITE: Stream directly to MongoDB using native sink
+query = transformed_stream \
     .writeStream \
-    .foreachBatch(write_to_mongodb) \      # Call our function for each batch
-    .option("checkpointLocation", path) \  # Track progress
-    .trigger(processingTime="5 seconds") \# Check every 5 seconds
+    .format("mongodb") \
+    .option("spark.mongodb.connection.uri", mongodb_uri) \
+    .option("spark.mongodb.database", "banking_odl") \
+    .option("spark.mongodb.collection", "account_statements") \
+    .option("spark.mongodb.operationType", "update") \
+    .option("spark.mongodb.upsertDocument", "true") \
+    .option("checkpointLocation", path) \
     .start()
 ```
 
 **In plain English:**
 1. **Read** changes from Delta Lake (not all data, just what changed)
-2. **Transform** each batch (rename columns to match MongoDB schema)
-3. **Write** to MongoDB Atlas using the Spark Connector
-4. **Repeat** every 5 seconds
+2. **Transform** the stream (rename columns to match MongoDB schema)
+3. **Write** to MongoDB Atlas using the native streaming sink
+4. **Process** data as it arrives (no fixed interval)
 
 #### What About MongoDB Change Streams?
 
@@ -557,7 +549,7 @@ query = delta_stream \
    > `/Workspace/Users/your.email@company.com/checkpoints/odl_streaming`
 
 4. Click **Run All**
-5. **Leave this notebook running** - it continuously checks for changes
+5. **Leave this notebook running** - it continuously streams data as it arrives
 6. Verify data in MongoDB Atlas:
    ```javascript
    db.account_statements.countDocuments()
@@ -570,19 +562,19 @@ query = delta_stream \
 | Notebook | Role | Runs... |
 |----------|------|---------|
 | **02_data_generator** | Creates new data in Delta Lake | Only when YOU run it |
-| **03_streaming_to_mongodb** | Moves data from Delta Lake → MongoDB | Continuously (every 5 sec) |
+| **03_streaming_to_mongodb** | Moves data from Delta Lake → MongoDB | Continuously (as data arrives) |
 
-**The 5-second interval** is how often notebook 03 *checks* for new data - not how often data is created.
+Notebook 03 uses **native streaming mode** - it processes data as soon as it arrives in Delta Lake (no fixed polling interval).
 
 ```
 You run notebook 02          Notebook 03 (always running)
         │                              │
-        │ creates data                 │ checks every 5 seconds
+        │ creates data                 │ streams immediately
         ▼                              ▼
    Delta Lake ─────────────────▶ MongoDB Atlas
         │                              │
         │                              │
-   No new data?                   Nothing to sync
+   No new data?                   Waiting for changes
 ```
 
 ### Demo: Show Real-Time Sync
@@ -596,7 +588,7 @@ To demonstrate real-time data flow, run **both notebooks simultaneously**:
    - `generation_interval_seconds`: `5` (new data every 5 seconds)
    - `continuous_duration_minutes`: `5` (run for 5 minutes)
 4. Click **Run All** on notebook 02
-5. Watch new data appear in MongoDB within 5-10 seconds
+5. Watch new data appear in MongoDB within seconds
 
 ---
 

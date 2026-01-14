@@ -4,8 +4,7 @@ import { SyncMonitor } from './components/SyncMonitor';
 import { AccountLookup } from './components/AccountLookup';
 import { TransactionExplorer } from './components/TransactionExplorer';
 import { ChangeStreamFeed } from './components/ChangeStreamFeed';
-import { PerformanceDashboard } from './components/PerformanceDashboard';
-import { LoadTestPanel } from './components/LoadTestPanel';
+import { QueryReference } from './components/QueryReference';
 import { healthApi } from './services/api';
 
 function App() {
@@ -13,7 +12,6 @@ function App() {
   const [apiHealthy, setApiHealthy] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [darkMode, setDarkMode] = useState(true); // Dark mode by default
-  const [loadTestStarted, setLoadTestStarted] = useState(false);
 
   // Apply dark mode class to html element
   useEffect(() => {
@@ -42,7 +40,7 @@ function App() {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Activity },
     { id: 'transactions', label: 'Transactions', icon: Database },
-    { id: 'performance', label: 'Performance', icon: Activity },
+    { id: 'queries', label: 'Queries', icon: Database },
   ];
 
   return (
@@ -152,12 +150,6 @@ function App() {
                 <ChangeStreamFeed accountNumber={selectedAccount} />
               </div>
             </div>
-
-            {/* Performance and Load Test */}
-            <div className={`grid grid-cols-1 ${loadTestStarted ? 'lg:grid-cols-2' : ''} gap-6`}>
-              {loadTestStarted && <PerformanceDashboard />}
-              <LoadTestPanel onTestStart={() => setLoadTestStarted(true)} />
-            </div>
           </div>
         )}
 
@@ -177,15 +169,10 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'performance' && (
-          <div className="space-y-6">
-            {loadTestStarted && <PerformanceDashboard />}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <LoadTestPanel onTestStart={() => setLoadTestStarted(true)} />
-              <ChangeStreamFeed accountNumber={selectedAccount} />
-            </div>
-          </div>
+        {activeTab === 'queries' && (
+          <QueryReference />
         )}
+
       </main>
 
       {/* Footer */}
@@ -194,8 +181,6 @@ function App() {
           <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
             <div className="flex items-center gap-2">
               <span>MongoDB Atlas ODL Demo</span>
-              <span className="text-gray-300 dark:text-gray-600">|</span>
-              <span>Competing against Databricks Lakebase</span>
             </div>
             <div className="flex items-center gap-4">
               <span>Architecture: Databricks Lakehouse → Spark Streaming → MongoDB Atlas</span>

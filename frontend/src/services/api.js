@@ -122,6 +122,13 @@ export const metricsApi = {
   getSyncStatus: () => fetchApi('/api/v1/sync/status'),
 };
 
+// Benchmark endpoints
+export const benchmarkApi = {
+  start: () => fetchApi('/api/v1/benchmark/start', { method: 'POST' }),
+  stop: () => fetchApi('/api/v1/benchmark/stop', { method: 'POST' }),
+  status: () => fetchApi('/api/v1/benchmark/status'),
+};
+
 // Health check
 export const healthApi = {
   check: () => fetchApi('/health'),

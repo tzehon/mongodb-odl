@@ -374,26 +374,28 @@ This proves MongoDB Atlas can handle high throughput with low latency.
 
 1. **Open Locust**: http://localhost:8089
 
-2. **Configure the test**:
+2. **Pre-configured settings** (from `locust.conf`):
    | Setting | Value |
    |---------|-------|
-   | Number of users | 100 |
-   | Spawn rate | 10 |
+   | Number of users | 200 |
+   | Spawn rate | 50 |
    | Host | `http://api:8000` |
+   | Run time | 30s |
 
-3. **Click "Start Swarming"**
+3. **Click "Start Swarming"** - Benchmark mode is auto-enabled
 
 4. **Watch the real-time charts**:
    - **Charts tab** → Look at "Total Requests per Second" (should reach 500+)
-   - **Statistics tab** → Look at "95%ile" column (should be < 100ms)
+   - **Statistics tab** → Check P95 response times (should be < 100ms)
+   - Response times shown are actual MongoDB `executionTimeMillis` from explain queries
 
-5. **Stop after 60 seconds** and review the summary
+5. Test auto-stops after 30 seconds
 
 #### Option 2: Command Line (Automated Testing)
 
 ```bash
 cd load-testing
-./run_load_test.sh -u 100 -r 10 -t 60s --headless --html
+./run_load_test.sh -u 200 -r 50 -t 30s --headless --html
 ```
 
 #### Reading the Results
@@ -425,6 +427,8 @@ SLA Verification:
 | **P95 Latency** | Statistics tab → "95%ile" column | < 100ms |
 | **Failure Rate** | Statistics tab → "Failures" column | 0% |
 
+> **Note**: Response times shown are actual MongoDB execution time (`executionTimeMillis` from explain), excluding network latency.
+
 #### What to Highlight
 
 - "MongoDB Atlas handles **500+ queries per second** with ease"
@@ -434,7 +438,7 @@ SLA Verification:
 
 ---
 
-### Demo Flow Summary (25 minutes)
+### Demo Flow Summary (20 minutes)
 
 | Step | What to Show | Time |
 |------|--------------|------|
@@ -444,20 +448,6 @@ SLA Verification:
 | 4 | Full-text search ("fairprice", "grab") | 3 min |
 | 5 | Change Stream Feed (real-time events) | 3 min |
 | 6 | **Load test demo** (Locust → prove 500 QPS, <100ms) | 5 min |
-| 7 | Competitive comparison slide | 2 min |
-
----
-
-## MongoDB Atlas ODL vs Databricks Lakebase
-
-| Capability | MongoDB Atlas | Databricks Lakebase |
-|------------|---------------|---------------------|
-| **Maturity** | Production-proven since 2016 | Public Preview (June 2025) |
-| **Scale** | Unlimited (sharding) | 2 TB max, 1000 connections |
-| **Latency** | Sub-millisecond possible | Unproven at scale |
-| **Full-Text Search** | Built-in Atlas Search | Not available |
-| **CDC** | Bi-directional Change Streams | One-way sync only |
-| **Regions** | 100+ globally | Limited |
 
 ---
 
@@ -494,14 +484,19 @@ GET /api/v1/sync/status
 ## Load Testing
 
 ### Locust Web UI
-1. Open http://localhost:8089
-2. Users: 100, Spawn rate: 10
+1. Open http://localhost:8089 (available when docker-compose is running)
+2. Default config: 200 users, spawn rate 50, 30s run time (pre-configured in `locust.conf`)
 3. Click **Start Swarming**
+
+**Benchmark Mode**: Locust automatically enables benchmark mode when the test starts. This:
+- Runs explain-only queries against MongoDB
+- Reports actual MongoDB `executionTimeMillis` (DB execution time, not network round-trip)
+- Response times shown in Locust are true MongoDB server-side latency
 
 ### Command Line
 ```bash
 cd load-testing
-./run_load_test.sh -u 100 -r 10 -t 60s --headless --html
+./run_load_test.sh -u 200 -r 50 -t 30s --headless --html
 ```
 
 ---

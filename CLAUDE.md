@@ -90,8 +90,8 @@ Databricks (Delta Lake) ──Spark Streaming + MongoDB Connector──▶ Mongo
 
 ### Frontend (`frontend/`)
 - React 18 + Vite + Tailwind CSS
-- `src/App.jsx` - Main app with tab navigation
-- `src/components/` - SyncMonitor, AccountLookup, TransactionExplorer, ChangeStreamFeed, PerformanceDashboard
+- `src/App.jsx` - Main app with tab navigation (Overview, Transactions)
+- `src/components/` - SyncMonitor, AccountLookup, TransactionExplorer, ChangeStreamFeed
 
 ### Databricks Notebooks (`databricks/`)
 - `01_setup_delta_tables.py` - Creates Delta Lake schema (run once)
@@ -111,7 +111,10 @@ df.write \
 
 ### Load Testing (`load-testing/`)
 - `locustfile.py` - Two user classes: BankingAPIUser (realistic), HighThroughputUser (max QPS)
+- Auto-enables benchmark mode on test start (runs explain-only queries)
+- Reports actual MongoDB `executionTimeMillis` (from `_dbExecTimeMs` in response body) instead of network round-trip
 - Automatically verifies SLA targets at test completion
+- Access at http://localhost:8089 when docker-compose is running
 
 ## MongoDB Schema
 

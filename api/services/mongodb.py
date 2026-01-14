@@ -109,21 +109,42 @@ async def get_explain_execution_time(db, collection_name: str, pipeline: list) -
         exec_time = (time.perf_counter() - start) * 1000  # Convert to ms
 
         # Try to get executionTimeMillis from result (more accurate if available)
-        reported_time = 0
+        # Use None to distinguish "field not found" from "field is 0" (sub-millisecond)
+        reported_time = None
 
         if 'executionStats' in explain_result:
-            reported_time = explain_result['executionStats'].get('executionTimeMillis', 0)
+            if 'executionTimeMillis' in explain_result['executionStats']:
+                reported_time = explain_result['executionStats']['executionTimeMillis']
 
-        if reported_time == 0 and 'stages' in explain_result:
+        if reported_time is None and 'stages' in explain_result:
             for stage in explain_result.get('stages', []):
                 if '$cursor' in stage:
                     exec_stats = stage['$cursor'].get('executionStats', {})
-                    reported_time = exec_stats.get('executionTimeMillis', 0)
-                    break
+                    if 'executionTimeMillis' in exec_stats:
+                        reported_time = exec_stats['executionTimeMillis']
+                        break
+                # Atlas Search has timing in $_internalSearchMongotRemote.explain.query.stats
+                if '$_internalSearchMongotRemote' in stage:
+                    search_explain = stage['$_internalSearchMongotRemote'].get('explain', {})
+                    query_stats = search_explain.get('query', {}).get('stats', {})
+                    if query_stats:
+                        # Sum up context + match + score millisElapsed
+                        context_ms = query_stats.get('context', {}).get('millisElapsed', 0)
+                        match_ms = query_stats.get('match', {}).get('millisElapsed', 0)
+                        score_ms = query_stats.get('score', {}).get('millisElapsed', 0)
+                        reported_time = context_ms + match_ms + score_ms
+                        break
+                    # Fallback to resourceUsage CPU time
+                    resource_usage = search_explain.get('resourceUsage', {})
+                    if resource_usage:
+                        user_ms = resource_usage.get('userTimeMs', 0)
+                        system_ms = resource_usage.get('systemTimeMs', 0)
+                        reported_time = user_ms + system_ms
+                        break
 
-        # Use reported time if available, otherwise use wall-clock
-        final_time = reported_time if reported_time > 0 else exec_time
-        logger.info(f"Agg explain: reported={reported_time}ms, wall={exec_time:.2f}ms, using={final_time:.2f}ms")
+        # Use reported time if found (even if 0 = sub-millisecond), otherwise wall-clock
+        final_time = reported_time if reported_time is not None else exec_time
+        logger.debug(f"Agg explain: reported={reported_time}ms, wall={exec_time:.2f}ms, using={final_time}ms")
         return float(final_time)
     except Exception as e:
         logger.warning(f"Could not get explain time: {e}")
@@ -150,21 +171,24 @@ async def get_find_explain_time(db, collection_name: str, filter_doc: dict, sort
         exec_time = (time.perf_counter() - start) * 1000  # Convert to ms
 
         # Try to get executionTimeMillis from result (more accurate if available)
-        reported_time = 0
+        # Use None to distinguish "field not found" from "field is 0" (sub-millisecond)
+        reported_time = None
 
         if 'executionStats' in explain_result:
-            reported_time = explain_result['executionStats'].get('executionTimeMillis', 0)
+            if 'executionTimeMillis' in explain_result['executionStats']:
+                reported_time = explain_result['executionStats']['executionTimeMillis']
 
-        if reported_time == 0 and 'stages' in explain_result:
+        if reported_time is None and 'stages' in explain_result:
             for stage in explain_result.get('stages', []):
                 if '$cursor' in stage:
                     exec_stats = stage['$cursor'].get('executionStats', {})
-                    reported_time = exec_stats.get('executionTimeMillis', 0)
-                    break
+                    if 'executionTimeMillis' in exec_stats:
+                        reported_time = exec_stats['executionTimeMillis']
+                        break
 
-        # Use reported time if available, otherwise use wall-clock
-        final_time = reported_time if reported_time > 0 else exec_time
-        logger.info(f"Find explain: reported={reported_time}ms, wall={exec_time:.2f}ms, using={final_time:.2f}ms")
+        # Use reported time if found (even if 0 = sub-millisecond), otherwise wall-clock
+        final_time = reported_time if reported_time is not None else exec_time
+        logger.debug(f"Find explain: reported={reported_time}ms, wall={exec_time:.2f}ms, using={final_time}ms")
         return float(final_time)
     except Exception as e:
         logger.warning(f"Could not get find explain time: {e}")

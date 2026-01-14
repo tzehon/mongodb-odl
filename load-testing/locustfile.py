@@ -93,7 +93,8 @@ class BankingAPIUser(HttpUser):
 
             if resp.status_code == 200:
                 db_time = get_db_exec_time(resp)
-                if db_time is not None and db_time > 0:
+                if db_time is not None:
+                    # 0ms is valid - means query ran in <1ms (excellent!)
                     events.request.fire(
                         request_type=method,
                         name=name,
@@ -103,12 +104,13 @@ class BankingAPIUser(HttpUser):
                         context=self.context()
                     )
                 else:
+                    # _dbExecTimeMs field missing entirely
                     events.request.fire(
                         request_type=method,
                         name=name,
                         response_time=0,
                         response_length=response_length,
-                        exception=Exception("No DB time"),
+                        exception=Exception("No _dbExecTimeMs in response"),
                         context=self.context()
                     )
             else:
@@ -245,7 +247,8 @@ class HighThroughputUser(HttpUser):
 
             if resp.status_code == 200:
                 db_time = get_db_exec_time(resp)
-                if db_time is not None and db_time > 0:
+                if db_time is not None:
+                    # 0ms is valid - means query ran in <1ms (excellent!)
                     events.request.fire(
                         request_type=method,
                         name=name,
@@ -260,7 +263,7 @@ class HighThroughputUser(HttpUser):
                         name=name,
                         response_time=0,
                         response_length=response_length,
-                        exception=Exception("No DB time"),
+                        exception=Exception("No _dbExecTimeMs in response"),
                         context=self.context()
                     )
             else:

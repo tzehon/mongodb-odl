@@ -22,28 +22,28 @@ Follow these steps in order:
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     DATABRICKS LAKEHOUSE                        │
-│                      (Delta Lake Tables)                        │
-│                              │                                   │
-│              Spark Structured Streaming                          │
-│              MongoDB Connector v10.5                             │
-└──────────────────────────────┼───────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    MONGODB ATLAS (ODL)                          │
-│  • account_statements collection                                 │
-│  • Compound indexes for OLTP queries                            │
-│  • Atlas Search for full-text                                   │
-│  • Change Streams for CDC                                       │
-└──────────────────────────────┼───────────────────────────────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              │                │                │
-              ▼                ▼                ▼
-         FastAPI API     React Dashboard    Locust
-         (Port 8000)      (Port 3000)     (Port 8089)
+┌───────────────────────────────────────────────────────────────┐
+│                    DATABRICKS LAKEHOUSE                       │
+│                     (Delta Lake Tables)                       │
+│                             │                                 │
+│             Spark Structured Streaming                        │
+│             MongoDB Connector v10.5                           │
+└───────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌───────────────────────────────────────────────────────────────┐
+│                     MONGODB ATLAS (ODL)                       │
+│  • account_statements collection                              │
+│  • Compound indexes for OLTP queries                          │
+│  • Atlas Search for full-text                                 │
+│  • Change Streams for CDC                                     │
+└───────────────────────────────────────────────────────────────┘
+                              │
+             ┌────────────────┼────────────────┐
+             │                │                │
+             ▼                ▼                ▼
+        FastAPI API    React Dashboard      Locust
+        (Port 8000)     (Port 3000)      (Port 8089)
 ```
 
 ### Target SLA
@@ -54,30 +54,30 @@ Follow these steps in order:
 ### How the Components Connect
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              FULL DATA FLOW                                  │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                             FULL DATA FLOW                              │
+└─────────────────────────────────────────────────────────────────────────┘
 
-  DATABRICKS LAKEHOUSE                          MONGODB ATLAS (ODL)
-  ┌─────────────────────┐                      ┌─────────────────────┐
-  │ Delta Lake          │   Spark Streaming   │ account_statements  │
-  │ (source of truth)   │ ─────────────────▶  │ collection          │
-  │                     │   + MongoDB Spark   │                     │
-  │                     │     Connector       │                     │
-  └─────────────────────┘                      └─────────────────────┘
-                                                         │
-                                                         │ Change Streams (CDC)
-                                                         ▼
-                                               ┌─────────────────────┐
-                                               │ FastAPI Application │
-                                               │ (REST + WebSocket)  │
-                                               └─────────────────────┘
-                                                         │
-                                                         │ HTTP / WebSocket
-                                                         ▼
-                                               ┌─────────────────────┐
-                                               │ React Dashboard     │
-                                               └─────────────────────┘
+  DATABRICKS LAKEHOUSE                        MONGODB ATLAS (ODL)
+  ┌─────────────────────┐                    ┌─────────────────────┐
+  │ Delta Lake          │  Spark Streaming   │ account_statements  │
+  │ (source of truth)   │ ────────────────▶  │ collection          │
+  │                     │  + MongoDB Spark   │                     │
+  │                     │    Connector       │                     │
+  └─────────────────────┘                    └─────────────────────┘
+                                                       │
+                                                       │ Change Streams (CDC)
+                                                       ▼
+                                             ┌─────────────────────┐
+                                             │ FastAPI Application │
+                                             │ (REST + WebSocket)  │
+                                             └─────────────────────┘
+                                                       │
+                                                       │ HTTP / WebSocket
+                                                       ▼
+                                             ┌─────────────────────┐
+                                             │ React Dashboard     │
+                                             └─────────────────────┘
 ```
 
 ### Two "Change" Mechanisms
@@ -96,22 +96,22 @@ Delta Lake ──CDF──▶ Spark ──Connector──▶ MongoDB ──Chang
 The dashboard shows **Pipeline Latency** - the actual time Spark takes to process a batch and write to MongoDB.
 
 ```
-                    TIMELINE
-    ────────────────────────────────────────────────────────────────▶ time
+                                      TIMELINE
+────────────────────────────────────────────────────────────────────────▶ time
 
-    T0              T1                      T2
-    │               │                       │
-    ▼               ▼                       ▼
-┌───────┐     ┌───────────┐          ┌───────────┐     ┌──────────────┐
-│ Data  │     │  Spark    │          │  MongoDB  │     │   Dashboard  │
-│Created│     │  Batch    │          │  Write    │────▶│ (via Change  │
-│       │     │ Starts    │          │ Complete  │     │   Streams)   │
-└───────┘     └───────────┘          └───────────┘     └──────────────┘
-    │               │                       │                  │
-    │◄─────────────►│◄─────────────────────►│                  │
-    │ Trigger Wait  │     Pipeline          │    Real-time     │
-    │ (excluded)    │     Latency           │    (no polling)  │
-    │               │     (measured)        │                  │
+   T0               T1                       T2
+   │                │                        │
+   ▼                ▼                        ▼
+┌───────┐     ┌───────────┐          ┌─────────────┐     ┌──────────────┐
+│ Data  │     │   Spark   │          │   MongoDB   │     │  Dashboard   │
+│Created│     │   Batch   │          │    Write    │────▶│ (via Change  │
+│       │     │  Starts   │          │  Complete   │     │   Streams)   │
+└───────┘     └───────────┘          └─────────────┘     └──────────────┘
+   │                │                        │                   │
+   │◄──────────────►│◄──────────────────────►│                   │
+   │  Trigger Wait  │       Pipeline         │     Real-time     │
+   │   (excluded)   │       Latency          │    (no polling)   │
+   │                │      (measured)        │                   │
 ```
 
 **How it works:**

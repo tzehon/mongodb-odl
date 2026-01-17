@@ -26,7 +26,7 @@ dbutils.widgets.text("mongodb_collection", "account_statements", "MongoDB Collec
 # Note: Update this path with your username if DBFS is disabled
 # Use format: /Workspace/Users/<your-email>/checkpoints/odl_streaming
 dbutils.widgets.text("checkpoint_path", "/Workspace/checkpoints/odl_streaming/account_statements", "Checkpoint Path")
-dbutils.widgets.dropdown("start_fresh", "false", ["true", "false"], "Start Fresh (clear checkpoint)")
+dbutils.widgets.dropdown("start_fresh", "true", ["true", "false"], "Start Fresh (clear checkpoint)")
 
 # COMMAND ----------
 
@@ -345,15 +345,23 @@ for q in spark.streams.active:
 # MAGIC %md
 # MAGIC ## Cleanup and Restart Instructions
 # MAGIC
-# MAGIC ### To restart streaming from scratch:
-# MAGIC 1. Set `start_fresh` widget to `true`
+# MAGIC ### Default behavior (`start_fresh=true`):
+# MAGIC - Clears checkpoint and reprocesses all data from Delta Lake
+# MAGIC - Use this for fresh runs or after resetting Delta tables
+# MAGIC
+# MAGIC ### To resume streaming from checkpoint:
+# MAGIC 1. Set `start_fresh` widget to `false`
 # MAGIC 2. Re-run all cells
+# MAGIC 3. The stream will resume from the last checkpoint (only processes new changes)
 # MAGIC
 # MAGIC ### To stop streaming:
 # MAGIC ```python
 # MAGIC query.stop()
 # MAGIC ```
 # MAGIC
-# MAGIC ### To resume streaming after notebook restart:
-# MAGIC 1. Keep `start_fresh` as `false`
-# MAGIC 2. The stream will resume from the last checkpoint
+# MAGIC ### When to use each mode:
+# MAGIC | Scenario | `start_fresh` setting |
+# MAGIC |----------|----------------------|
+# MAGIC | First run | `true` (default) |
+# MAGIC | After resetting Delta tables | `true` (default) |
+# MAGIC | Resume after compute restart (want new data only) | `false` |

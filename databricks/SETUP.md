@@ -439,7 +439,7 @@ The streaming runs **continuously** using a micro-batch pattern:
 | Setting | What It Controls |
 |---------|------------------|
 | `checkpoint_path` | Where to save progress (survives restarts) |
-| `start_fresh` | If true, ignores checkpoint and reprocesses all data |
+| `start_fresh` | If true (default), clears checkpoint and reprocesses all data. Set to false to resume from checkpoint. |
 
 **To stop streaming**: Run `query.stop()` in the notebook, or terminate the compute.
 
@@ -543,7 +543,7 @@ query = transformed_stream \
    - `mongodb_collection`: `account_statements`
    - `trigger_interval`: `5 seconds` (how often to check for new data)
    - `checkpoint_path`: `/Workspace/Users/<your-email>/checkpoints/odl_streaming` (see note below)
-   - `start_fresh`: `false` (set to `true` to reprocess all data)
+   - `start_fresh`: `true` (default - reprocesses all data; set to `false` to resume from checkpoint)
 
    > **Note**: If you get a DBFS access error, change `checkpoint_path` to use your Workspace path:
    > `/Workspace/Users/your.email@company.com/checkpoints/odl_streaming`

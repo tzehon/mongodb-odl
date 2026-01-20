@@ -673,7 +673,7 @@ Replace `<your-email>` with your Databricks username (e.g., `john.doe@company.co
 
 Example:
 ```
-/Workspace/Users/tzehon.tan@outlook.com/checkpoints/odl_streaming
+/Workspace/Users/john.doe@company.com/checkpoints/odl_streaming
 ```
 
 ### Getting Help
